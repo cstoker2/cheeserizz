@@ -31,7 +31,7 @@ IntervalTimer pwmTimer;
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   delay(100);
-  Serial.println("\n cheeseRizz13_diagnostic_accel.ino");
+  Serial.println("\n cheeseRizz14.ino");
   Serial.begin(115200);
   Serial1.begin(115200);  // connect BT12 module here, pin0 RX1, pin1 TX1
   Serial.println("Initializing Meltybrain Robot...");
