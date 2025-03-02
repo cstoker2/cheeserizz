@@ -1011,15 +1011,18 @@ void sendTelemetryOverBT() {
 void MeltybrainDrive1() {  //accelerometer version
   float rps = calculateRPS();
   lastRPS = rps;
-  heading = getHeading();
   unsigned long revTimeMicros = (1000000 / rps);
   unsigned long usCurrentTime = micros();
   usRevStartTime = usCurrentTime;
-  float currentPhase = robotHeading / 360.0;  // from magnetometer
+
   ledInterruptsEnabled = false;               // Bypass LED interrupt action
 
   // Track hot loop iterations for diagnostic purposes
   int32_t hotLoopCount = 0;
+
+  heading = getHeading();   //basic magnetometer heading for logging comparison only
+  float currentPhase = robotHeading / 360.0;  // from magnetometer peaks/valleydetect for comparrison only
+  
 
   //HOT LOOP
   while (true) {
@@ -1035,31 +1038,10 @@ void MeltybrainDrive1() {  //accelerometer version
 
     hotLoopCount++;  // Count iterations of the hot loop
 
-    float acc_ph = (float)currentTimeMicros / (float)revTimeMicros;  // phase from accel calc.
-    stickAngle = -stickAngle;                                        // reverse for correct steering
+    float acc_ph = (float)currentTimeMicros / (float)revTimeMicros;  // phase from accel calc. comparison
+    stickAngle = -stickAngle;                                        // reverse input angle for correct steering
     // Calculate target phase based on stick input
-    float targetPhase = stickAngle;
-    float backwardsPhase = (stickAngle + 0.5) > 1.0 ? (stickAngle + 0.5) - 1.0 : (stickAngle + 0.5);
-    float ledPhase = (stickAngle + ledOffset) > 1.0 ? (stickAngle + ledOffset) - 1.0 : (stickAngle + ledOffset);
-    // magnetometer demonstrationsection for comparison:
-    // Calculate phase differences (normalized to -0.5 to 0.5 range)
-    float forwardDiff = targetPhase - currentPhase;
-    if (forwardDiff > 0.5) forwardDiff -= 1.0;
-    if (forwardDiff < -0.5) forwardDiff += 1.0;
-
-    float backwardDiff = backwardsPhase - currentPhase;
-    if (backwardDiff > 0.5) backwardDiff -= 1.0;
-    if (backwardDiff < -0.5) backwardDiff += 1.0;
-
-    float ledDiff = ledPhase - currentPhase;
-    if (ledDiff > 0.5) ledDiff -= 1.0;
-    if (ledDiff < -0.5) ledDiff += 1.0;
-
-    // Convert phase differences to angles for cosine calculation
-    float mag_ph1 = forwardDiff * 2.0 * M_PI;
-    float mag_ph2 = backwardDiff * 2.0 * M_PI;
-    float mag_ledPh = ledDiff * 2.0 * M_PI;
-
+    
     //accelerometer version, actuall doing the steering
     float timeToForward = stickAngle * revTimeMicros;
     float timeToBackward = (stickAngle + 0.5) * revTimeMicros;  // 1/2 revolution further along for backwards
@@ -1090,6 +1072,29 @@ void MeltybrainDrive1() {  //accelerometer version
     leds.setPixel(0, COLOR);
     leds.setPixel(1, COLOR);
     leds.show();
+
+// magnetometer references for comparison and logging only, not for driving yet.
+    // Calculate phase differences (normalized to -0.5 to 0.5 range)
+    float targetPhase = stickAngle;
+    float backwardsPhase = (stickAngle + 0.5) > 1.0 ? (stickAngle + 0.5) - 1.0 : (stickAngle + 0.5);
+    float ledPhase = (stickAngle + ledOffset) > 1.0 ? (stickAngle + ledOffset) - 1.0 : (stickAngle + ledOffset);
+
+    float forwardDiff = targetPhase - currentPhase;
+    if (forwardDiff > 0.5) forwardDiff -= 1.0;
+    if (forwardDiff < -0.5) forwardDiff += 1.0;
+
+    float backwardDiff = backwardsPhase - currentPhase;
+    if (backwardDiff > 0.5) backwardDiff -= 1.0;
+    if (backwardDiff < -0.5) backwardDiff += 1.0;
+
+    float ledDiff = ledPhase - currentPhase;
+    if (ledDiff > 0.5) ledDiff -= 1.0;
+    if (ledDiff < -0.5) ledDiff += 1.0;
+
+    // Convert phase differences to angles for cosine calculation
+    float mag_ph1 = forwardDiff * 2.0 * M_PI;
+    float mag_ph2 = backwardDiff * 2.0 * M_PI;
+    float mag_ledPh = ledDiff * 2.0 * M_PI;
 
     // Capture telemetry data every few iterations
     // We're using modulo 4 to capture roughly every 4th iteration (25% sample rate)
