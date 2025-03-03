@@ -1,7 +1,7 @@
-#define LED_COUNT_TOP 8        // 8 top
+#define LED_COUNT_TOP 8        // 8 top sk6812 leds
 #define LED_COUNT_BOT 2        // 2 bottom
-#define BRIGHTNESS 100         // Set BRIGHTNESS (max = 255) keep low for testing
-#define I2C_ADDR_ACCEL 0x19    // sparkfun
+#define BRIGHTNESS 200         // Set BRIGHTNESS (max = 255) keep low for testing
+#define I2C_ADDR_ACCEL 0x19    // sparkfun accelerometer 
 #define SERIAL_IBUS Serial2    // pin 7 serial2
 #define SERIAL_TX_LEDS 17      // top string of 8 leds
 #define SERIAL_TX_LEDS_BOT 20  // bottom string of 2 leds
