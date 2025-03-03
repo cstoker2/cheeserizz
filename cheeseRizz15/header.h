@@ -13,18 +13,16 @@
 // Motor direction constants
 #define MOTOR1_DIRECTION -1.0       // Set to -1 to reverse motor 1, 1 for normal
 #define MOTOR2_DIRECTION -1.0       // Set to -1 to reverse motor 2, 1 for normal
-#define MAG_BUFFER_SIZE 128         // Buffer size for peak/valley detection
+#define MAG_BUFFER_SIZE 128         // Buffer size for magnetometer readings
 #define HEADING_SMOOTHING 0.85      // Smoothing factor for heading updates (0-1)
-#define MIN_PEAK_VALLEY_DIFF 10000  // Minimum difference to qualify as a peak/valley
 
-// Replace the DiagnosticData structure with this more flexible structure
+// Define the telemetry buffer size
 #define TELEMETRY_BUFFER_SIZE 256  // Size of telemetry data buffer to hold a full rotation
 
 // Phase tracking variables
 static float continuousPhase = 0.0f;        // Current phase position (0.0-1.0)
 static float previousW = 0.0f;              // Previous angular velocity for trapezoidal integration
 static unsigned long lastPhaseUpdate = 0;    // Timestamp of last phase update (microseconds)
-
 
 // Generic telemetry data structure
 struct TelemetryData {
@@ -43,12 +41,12 @@ const char* telemetryLabels[] = {
   "timestamp",
   "magHeading",         // fl1: Magnetometer heading (0-1)
   "accelPhase",         // fl2: Phase calculated from accelerometer (0-1)
-  "targetPhase",        // fl3: Target phase from stick input
-  "ledPhase",           // fl4: LED target phase
-  "forwardDiff",        // fl5: Phase difference for forward direction
-  "backwardDiff",       // fl6: Phase difference for backward direction
-  "ledDiff",            // fl7: Phase difference for LED
-  "cos_ph1",            // fl8: Cosine value for forward motor
+  "forwardPhase",       // fl3: phase + stick
+  "backwardPhase",      // fl4: phase + stick + 0.5
+  "ledPhase",           // fl5: phase difference for led
+  "ledOffset",          // fl6: led offset value
+  "cos_ph1",            // fl7: cosine of motor 1 phase 
+  "stickAngle",         // fl8: Stick angle input
   "currentRPS",         // fl9: Current Revolutions Per Second
   "throttle",           // fl10: Throttle value (0-1)
   "hotLoopCount",       // int1: Iteration count in hot loop
@@ -66,26 +64,16 @@ struct MagData {
 };
 
 // Magnetometer global variables
-// Calibration variables
-int32_t magXOffset = 131072;  // Default mid-point (2^17)
-int32_t magYOffset = 131072;
-int32_t magZOffset = 131072;
-float magXScale = 1.0;
-float magYScale = 1.0;
+static int32_t magXOffset = 131072;  // Default mid-point (2^17)
+static int32_t magYOffset = 131072;
+static int32_t magZOffset = 131072;
+static float magXScale = 1.0;
+static float magYScale = 1.0;
 volatile bool newMagDataAvailable = false;
 MagData magBuffer[MAG_BUFFER_SIZE];
 uint8_t magBufferIndex = 0;
 uint8_t magBufferCount = 0;
-int32_t xMax = 0, xMin = 262144;  // 18-bit max value is 262144
-int32_t yMax = 0, yMin = 262144;
-uint32_t xMaxTime = 0, xMinTime = 0, yMaxTime = 0, yMinTime = 0;
 uint32_t lastPeakValleyDetectionTime = 0;
-
-float robotHeading = 0.0;         // Current heading in degrees (0-360)
-float headingCorrection = 0.0;    // Offset to align with desired forward direction
-float lastHeading = 0.0;          // Last stable heading for validation
-bool headingInitialized = false;  // Flag to indicate if we have a valid heading
-float RPMestimate = 0.0;          // Estimated RPM from magnetometer
 
 //colors: wrgb
 #define RED 0x00FF0000
@@ -99,13 +87,13 @@ volatile bool ledInterruptsEnabled = true;
 volatile uint16_t redState = 0xAAAA;    // 1010101010101010 Example pattern for red (alternates on/off)
 volatile uint16_t greenState = 0x0F0F;  // 0000111100001111 Example pattern for green (on/off in 128ms blocks)
 volatile uint16_t blueState = 0xFFFF;   // 1111111111111111 Example pattern for blue (always on)
-volatile uint16_t whiteState = 0;
+volatile uint16_t whiteState = 0;       // Kept as requested
 volatile uint8_t rbit;
 volatile uint8_t gbit;
 volatile uint8_t bbit;
 
 // LED pattern definitions
-#define LED_PATTERN_ERROR 0xDEDE, 0x0000, 0x0000           // Red flashing sos
+#define LED_PATTERN_ERROR 0xDEDE, 0x0000, 0x0000           // Red flashing sos (kept as requested)
 #define LED_PATTERN_RADIO_ERROR 0xF0F0, 0x0000, 0x0F00     // Red/blue flashing
 #define LED_PATTERN_THROTTLE_ERROR 0x0c0c, 0xF0F0, 0x0F0F  // blue green flashing
 #define LED_PATTERN_CALIBRATION 0x5555, 0x5555, 0x0000     // Yellow (R+G) fast
@@ -134,11 +122,6 @@ float accelOffsetY;
 float accelOffsetZ;
 float estimated_accel;  // for kalman filter
 
-// magnetometer offsets
-static uint32_t magOffsetX = 131072;
-static uint32_t magOffsetY = 131072;
-static uint32_t magOffsetZ = 131072;
-
 // Global variables for motor throttles
 float motor1Throttle = 0.0;
 float motor2Throttle = 0.0;
@@ -163,16 +146,13 @@ volatile float inputToggle = 0.0;    // ch6 left 3-way toggle
 volatile float heading = 0.0;
 volatile uint32_t headingMark = 0;  // time of heading measurement in micros
 
-//accelerometer  mag readings
+//accelerometer mag readings
 volatile float accel_x = 0.0;
 volatile float accel_y = 0.0;
 volatile float accel_z = 0.0;
 volatile float mag_x = 0.0;
 volatile float mag_y = 0.0;
 volatile float mag_z = 0.0;
-
-
-unsigned long usRevStartTime = 0;  // Time in microseconds when the revolution started
 
 // Constants for motor control
 const float boostThreshold = 0.2;        // Minimum throttle value for motor to start spinning

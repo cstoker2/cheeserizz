@@ -32,7 +32,7 @@ IntervalTimer pwmTimer;
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   delay(100);
-  Serial.println("\n cheeseRizz14.ino");
+  Serial.println("\n cheeseRizz15.ino");
   Serial.begin(115200);
   Serial1.begin(115200);  // connect BT12 module here, pin0 RX1, pin1 TX1
   Serial.println("Initializing Meltybrain Robot...");
@@ -361,9 +361,9 @@ void MeltybrainDrive1() {
 
     hotLoopCount++;  // Count iterations of the hot loop
 
-    float forwardPhase = normalize(continuousPhase + stickAngle, -0.5,0.5);
-    float backwardPhase = normalize(continuousPhase + stickAngle + 0.5, -0.5,0.5);
-    float ledPhase = normalize(continuousPhase + stickAngle + ledOffset, -0.5,0.5);
+    float forwardPhase = normalize(continuousPhase + stickAngle, -0.5, 0.5);
+    float backwardPhase = normalize(continuousPhase + stickAngle + 0.5, -0.5, 0.5);
+    float ledPhase = normalize(continuousPhase + stickAngle + ledOffset, -0.5, 0.5);
 
     float cos_ph1 = cos(forwardPhase * 2 * PI);
     float cos_ph2 = cos(backwardPhase * 2 * PI);
@@ -403,12 +403,12 @@ void MeltybrainDrive1() {
       captureTelemetryData(
         heading,          // fl1: MagHeading (0-1)
         continuousPhase,  // fl2: AccelerometerPhase(0-1)
-        forwardPhase,      // fl3: stickAngle
-        backwardPhase,         // fl4: LED target phase
-        ledPhase,      // fl5: phase difference for forward direction
-        0,     // fl6: phase difference for backward direction
-        cos_ph1,          // fl7: phase difference for LED
-        cos_ph2,          // fl8: cosine value for forward motor
+        forwardPhase,     // fl3: phase + stick
+        backwardPhase,    // fl4: phase + stick + 0.5
+        ledPhase,         // fl5: phase difference for led
+        ledOffset,        // fl6: led offset
+        cos_ph1,          // fl7: cosine of m1 phase
+        stickAngle,       // fl8: stickAngle
         currentRPS,       // fl9: RPS
         throttle,         // fl10: throttle
         hotLoopCount,     // int1: iteration count in hot loop

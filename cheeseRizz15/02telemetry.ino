@@ -71,8 +71,8 @@ void sendMagDataOverBT() {
       uint16_t currentIndex = (transmissionIndex + entriesSent) % MAG_BUFFER_SIZE;
 
       // Calculate normalized X and Y values
-      float norm_x = (magBuffer[currentIndex].rawX - magOffsetX) / 131072.0;
-      float norm_y = (magBuffer[currentIndex].rawY - magOffsetY) / 131072.0;
+      float norm_x = (magBuffer[currentIndex].rawX - magXOffset) / 131072.0;
+      float norm_y = (magBuffer[currentIndex].rawY - magYOffset) / 131072.0;
       
       float mag_heading = normalize((atan2(norm_y, norm_x) / (2 * PI)), 0.0, 1.0);
 
