@@ -20,6 +20,12 @@
 // Replace the DiagnosticData structure with this more flexible structure
 #define TELEMETRY_BUFFER_SIZE 256  // Size of telemetry data buffer to hold a full rotation
 
+// Phase tracking variables
+static float continuousPhase = 0.0f;        // Current phase position (0.0-1.0)
+static float previousW = 0.0f;              // Previous angular velocity for trapezoidal integration
+static unsigned long lastPhaseUpdate = 0;    // Timestamp of last phase update (microseconds)
+
+
 // Generic telemetry data structure
 struct TelemetryData {
   uint32_t timestamp;  // microseconds timestamp

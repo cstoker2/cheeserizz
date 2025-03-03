@@ -318,6 +318,21 @@ void updateLEDs() {
   i = (i + 1) & 0xF;
 }
 
+float normalize(float phase, float minVal = -0.5, float maxVal = 0.5) {
+  // Normalize to 0-1 range first
+  phase = fmod(phase, 1.0);
+  if (phase < 0) phase += 1.0;
+  
+  // Then shift to desired range
+  if (minVal != 0 || maxVal != 1.0) {
+    if (phase > maxVal && phase <= 1.0) phase -= 1.0;
+    if (phase < minVal) phase += 1.0;
+  }
+  
+  return phase;
+}
+
+
 // void processMagnetometerData() {
 //   if (newMagDataAvailable) {
 //     newMagDataAvailable = false;
@@ -672,7 +687,7 @@ float getHeading() {
   return heading_raw;
 }
 
-float calculateRPS() {
+float calculateW() {
   // Get accelerometer data
   sensors_event_t s;
   accel.getEvent(&s);
@@ -680,7 +695,7 @@ float calculateRPS() {
   // 1. Validate raw Z-axis acceleration
   if (isnan(s.acceleration.z) || isinf(s.acceleration.z)) {
     DEBUG_PRINTF(" Bad Z-accel: %.2f (X=%.2f, Y=%.2f)\n", s.acceleration.z, s.acceleration.x, s.acceleration.y);
-    return RPS_THRESHOLD;  // Return safe value instead of last estimate
+    return RPS_THRESHOLD * 2 * PI;  // Return safe value in radians/sec
   }
 
   // 2. Apply calibration offsets
@@ -688,30 +703,67 @@ float calculateRPS() {
 
   // 3. Update Kalman filter with calibrated value
   float spinAccel = kalmanFilter.updateEstimate(z);
+  estimated_accel = spinAccel; // Store for telemetry
 
   // 4. Check accelerometer data after filtering
   if ((spinAccel <= 0) || isnan(spinAccel) || isinf(spinAccel)) {
     DEBUG_PRINTF(" Invalid accel data: %1.2f\n", spinAccel);
-    return RPS_THRESHOLD;  // Fallback to safe value
+    return RPS_THRESHOLD * 2 * PI;  // Fallback to safe value in radians/sec
   }
 
   // 5. Check radius size
   if (radiusSize <= 0 || isnan(radiusSize) || isinf(radiusSize)) {
     DEBUG_PRINTF(" Invalid radius: %.4f\n", radiusSize);
-    return RPS_THRESHOLD;  // Fallback to safe value
+    return RPS_THRESHOLD * 2 * PI;  // Fallback to safe value in radians/sec
   }
 
-  // 6. Calculate omega (angular velocity)
-  float omega = sqrt(spinAccel / radiusSize);
-  float rps = omega / (2 * PI);
-
-  // 7. Update maxRPS if valid
-  if (rps > maxRPS) {  // No need to check isnan/isinf again since we already validated
+  // 6. Calculate w (angular velocity in radians/sec)
+  float w = sqrt(spinAccel / radiusSize);
+  
+  // 7. Calculate RPS for compatibility with existing code
+  float rps = w / (2 * PI);
+  
+  // 8. Update maxRPS if valid
+  if (rps > maxRPS) {
     maxRPS = rps;
   }
+  
+  lastRPS = rps; // Store for telemetry and other uses
 
-  // 8. Ensure RPS does not fall below threshold
-  return (rps < RPS_THRESHOLD) ? RPS_THRESHOLD : rps;
+  // 9. Ensure w does not fall below threshold
+  if (w < RPS_THRESHOLD * 2 * PI) {
+    w = RPS_THRESHOLD * 2 * PI;
+  }
+
+  return w;
+}
+
+void updatePhaseTracking(float w) {
+  // Get current time
+  unsigned long now = micros();
+  
+  // Calculate time since last update
+  unsigned long deltaTime = now - lastPhaseUpdate;
+  
+  // Skip if this is the first call or after a long delay
+  if (lastPhaseUpdate == 0 || deltaTime > 100000) { // 100ms
+    lastPhaseUpdate = now;
+    previousW = w;
+    return;
+  }
+  
+  // Trapezoidal integration: use average of current and previous angular velocity
+  float deltaAngle = (w + previousW) * 0.5f * deltaTime * 0.000001f;
+  
+  // Update continuous phase
+  continuousPhase += deltaAngle / (2 * PI);
+  
+  // Keep phase in 0.0-1.0 range
+  continuousPhase = normalize(continuousPhase, 0, 1.0);
+  
+  // Store for next iteration
+  previousW = w;
+  lastPhaseUpdate = now;
 }
 
 void captureTelemetryData(
@@ -911,88 +963,95 @@ void sendTelemetryOverBT() {
   }
 }
 
-void MeltybrainDrive1() {  //accelerometer version
-  float rps = calculateRPS();
-  heading = getHeading();  //basic magnetometer heading for logging comparison only
-  lastRPS = rps;
-  unsigned long revTimeMicros = (1000000 / rps);
+void MeltybrainDrive1() {
+  // Calculate initial angular velocity (w)
+  float w = calculateW();
+  
+  heading = getHeading();  // Basic magnetometer heading for logging comparison only
+  
+  // Initialize phase tracking
   unsigned long usCurrentTime = micros();
-  usRevStartTime = usCurrentTime;
+  lastPhaseUpdate = usCurrentTime;
+  continuousPhase = 0.0f; // Reset phase at the start
+  previousW = w; // Initial angular velocity
+  
   ledInterruptsEnabled = false;  // Bypass LED interrupt action
-
+  
   // Track hot loop iterations for diagnostic purposes
   int32_t hotLoopCount = 0;
-
-  //HOT LOOP
+  
+  // HOT LOOP
   while (true) {
-    unsigned long currentTimeMicros = micros() - usRevStartTime;
-
-    if (throttle < ZERO_THROTTLE_THRESHOLD || currentTimeMicros > 2000000) {  // 2sec timeout emergency exit
+    // Get current time
+    unsigned long currentTimeMicros = micros();
+    
+    // Exit conditions
+    if (throttle < ZERO_THROTTLE_THRESHOLD || (currentTimeMicros - usCurrentTime) > 2000000) {
       DEBUG_PRINTLN(" Throttle zero or Timeout");
       break;
     }
-    if (currentTimeMicros >= revTimeMicros) {  // stop loop after 1 rev, no debug msg
-      break;
-    }
-
+    
+    // Update angular velocity and phase tracking
+    float currentW = calculateW();
+    updatePhaseTracking(currentW);
+    
     hotLoopCount++;  // Count iterations of the hot loop
-
-    float acc_ph = (float)currentTimeMicros / (float)revTimeMicros;  // phase from accel calc. comparison
-    stickAngle = -stickAngle;                                        // reverse input angle for correct steering
-
-    //accelerometer version, actuall doing the steering
-    float timeToForward = stickAngle * revTimeMicros;
-    float timeToBackward = (stickAngle + 0.5) * revTimeMicros;  // 1/2 revolution further along for backwards
-    float timeLED = (stickAngle + ledOffset) * revTimeMicros;   // modified by right knob
-    if (timeToBackward > revTimeMicros) {
-      timeToBackward -= revTimeMicros;
-    }
-    if (timeLED > revTimeMicros) {
-      timeLED -= revTimeMicros;
-    }
-
+    
+    // Reverse input angle for correct steering
+    stickAngle = -stickAngle;
+    
+    // Use continuousPhase instead of time-based phase
+    float targetPhase = normalize(stickAngle, 0, 1.0);
+    float backwardPhase = normalize(targetPhase + 0.5, 0, 1.0);
+    float ledPhase = normalize(targetPhase + ledOffset, 0, 1.0);
+    
+    // Calculate phase differences (how far are we from target positions)
+    float forwardDiff = normalize(targetPhase - continuousPhase);
+    float backwardDiff = normalize(backwardPhase - continuousPhase);
+    float ledDiff = normalize(ledPhase - continuousPhase);
+    
+    // Calculate motor and LED outputs directly from phase differences
+    float cos_ph1 = cos(forwardDiff * 2 * PI);
+    float cos_ph2 = cos(backwardDiff * 2 * PI);
+    float cos_led = cos(ledDiff * 2 * PI);
+    
     float widthScale = max(stickLength, throttle);
-
-    float ph1 = ((currentTimeMicros + timeToForward) / revTimeMicros) * M_PI * 2.0f;
-    float ph2 = ((currentTimeMicros + timeToBackward) / revTimeMicros) * M_PI * 2.0f;
-    float ledPh = ((currentTimeMicros + timeLED) / revTimeMicros) * M_PI * 2.0f;
-    float cos_ph1 = cos(ph1);
-    float cos_ph2 = cos(ph2);
-    float cos_led = cos(ledPh);
     float th1 = max(0, (cos_ph1 * 0.25f * stickLength) + throttle);
     float th2 = max(0, (cos_ph2 * 0.25f * stickLength) + throttle);
-
+    
     setThrottle(th1, -th2);  // -th2 because of CW spin direction
-
-    bool LEDOn = cos_led > 0.7071 * (1.4 - widthScale * 0.9);  // magic numbers to get about 45deg of arc
+    
+    bool LEDOn = cos_led > 0.7071 * (1.4 - widthScale * 0.9);  // Magic numbers for ~45deg arc
     uint32_t COLOR = LEDOn * WHITE;
-    if (rps <= RPS_THRESHOLD) { COLOR = LEDOn * WHITE + LEDOn * GREEN; }  // add green if below threshold rps
+    float currentRPS = currentW / (2 * PI);
+    if (currentRPS <= RPS_THRESHOLD) { COLOR = LEDOn * WHITE + LEDOn * GREEN; }  // Add green if below threshold
     leds.setPixel(0, COLOR);
     leds.setPixel(1, COLOR);
     leds.show();
-
+    
     // Capture telemetry data every few iterations
-    // We're using modulo 4 to capture roughly every 4th iteration (25% sample rate)
     if (hotLoopCount % 4 == 0) {
-      // Capture telemetry using our new generic function
-      // Each parameter is explicitly named for clarity:
       captureTelemetryData(
-        heading,                    // fl1: current heading in degrees (0-360)
-        acc_ph,                     // fl2: current phase (0-1 range)
-        stickAngle,                 // fl3: target phase from stick input
-        ph1,                        // fl4: LED phase (adjusted by ledOffset)
-        ledPh,                      // fl5: phase difference for forward direction
-        ledOffset,                  // fl6: phase difference for backward direction
-        rps,                        // fl7: phase difference for LED
-        cos_ph1,                    // fl8: cosine value for forward motor
-        cos_ph2,                    // fl9: cosine value for backward motor
-        cos_led,                    // fl10: cosine value for LED
-        hotLoopCount,               // int1: iteration count in hot loop
-        LEDOn ? 1 : 0,              // int2: LED state (1=on, 0=off)
+        heading,               // fl1: magnetometer heading (0-360)
+        continuousPhase,       // fl2: current phase from accelerometer (0-1)
+        targetPhase,           // fl3: target phase from stick input
+        ledPhase,              // fl4: LED target phase
+        forwardDiff,           // fl5: phase difference for forward direction
+        backwardDiff,          // fl6: phase difference for backward direction
+        ledDiff,               // fl7: phase difference for LED
+        cos_ph1,               // fl8: cosine value for forward motor
+        cos_ph2,               // fl9: cosine value for backward motor
+        cos_led,               // fl10: cosine value for LED
+        hotLoopCount,          // int1: iteration count in hot loop
+        LEDOn ? 1 : 0,         // int2: LED state (1=on, 0=off)
         (int32_t)(throttle * 1000)  // int3: throttle value (scaled by 1000)
       );
     }
+    
+    // Implement a small delay to prevent excessive looping
+    delayMicroseconds(LOOP_DELAY_MICROS);
   }
+  
   ledInterruptsEnabled = true;  // Resume LED interrupt action
 }
 
