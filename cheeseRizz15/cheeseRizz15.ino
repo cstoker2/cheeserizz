@@ -403,12 +403,12 @@ void MeltybrainDrive1() {
       captureTelemetryData(
         heading,          // fl1: MagHeading (0-1)
         continuousPhase,  // fl2: AccelerometerPhase(0-1)
-        targetPhase,      // fl3: stickAngle
-        ledPhase,         // fl4: LED target phase
-        forwardDiff,      // fl5: phase difference for forward direction
-        backwardDiff,     // fl6: phase difference for backward direction
-        ledDiff,          // fl7: phase difference for LED
-        cos_ph1,          // fl8: cosine value for forward motor
+        forwardPhase,      // fl3: stickAngle
+        backwardPhase,         // fl4: LED target phase
+        ledPhase,      // fl5: phase difference for forward direction
+        0,     // fl6: phase difference for backward direction
+        cos_ph1,          // fl7: phase difference for LED
+        cos_ph2,          // fl8: cosine value for forward motor
         currentRPS,       // fl9: RPS
         throttle,         // fl10: throttle
         hotLoopCount,     // int1: iteration count in hot loop
