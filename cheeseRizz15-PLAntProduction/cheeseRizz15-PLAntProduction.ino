@@ -32,7 +32,7 @@ IntervalTimer pwmTimer;
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   delay(100);
-  Serial.println("\n cheeseRizz15.ino");
+  Serial.println("\n cheeseRizz15-PLAntProduction.ino");
   Serial.begin(115200);
   Serial1.begin(115200);  // connect BT12 module here, pin0 RX1, pin1 TX1
   Serial.println("Initializing Meltybrain Robot...");
@@ -112,10 +112,15 @@ void updateLEDs() {
   volatile uint32_t sumbits = rbit * RED + gbit * GREEN + bbit * BLUE;
 
   leds.clear();  // do we have to clear?
+  // leds are 012, bottom, 345 top.
   leds.setPixel(0, sumbits);
   leds.setPixel(1, sumbits);
-  //leds.setPixel(3, rbit * RED + gbit * GREEN + bbit * BLUE);
-  //leds.setPixel(5, rbit * RED + gbit * GREEN + bbit * BLUE);
+  leds.setPixel(2, sumbits);
+  leds.setPixel(3, sumbits);
+  leds.setPixel(4, sumbits);
+  leds.setPixel(5, sumbits);
+  // leds.setPixel(3, rbit * RED + gbit * GREEN + bbit * BLUE);
+  // leds.setPixel(5, rbit * RED + gbit * GREEN + bbit * BLUE);
   leds.show();
   i = (i + 1) & 0xF;
 }
@@ -222,27 +227,27 @@ void updateInputs() {
   sidewaysInput = (ibus.readChannel(7) - 1500) / 500.0;
 }
 
-float getHeading() {
-  // Get the most recent valid buffer index
-  int idx = (magBufferIndex == 0) ? (MAG_BUFFER_SIZE - 1) : (magBufferIndex - 1);
+// float getHeading() {
+//   // Get the most recent valid buffer index
+//   int idx = (magBufferIndex == 0) ? (MAG_BUFFER_SIZE - 1) : (magBufferIndex - 1);
 
-  // Use the most recent data from the buffer
-  uint32_t rawX = magBuffer[idx].rawX;
-  uint32_t rawY = magBuffer[idx].rawY;
+//   // Use the most recent data from the buffer
+//   uint32_t rawX = magBuffer[idx].rawX;
+//   uint32_t rawY = magBuffer[idx].rawY;
 
-  // Store the timestamp from the buffer
-  headingMark = magBuffer[idx].timestamp;
+//   // Store the timestamp from the buffer
+//   headingMark = magBuffer[idx].timestamp;
 
-  // Apply offsets and scaling to normalize readings
-  mag_x = ((int32_t)rawX - magXOffset) / 131072.0;
-  mag_y = ((int32_t)rawY - magYOffset) / 131072.0;
+//   // Apply offsets and scaling to normalize readings
+//   mag_x = ((int32_t)rawX - magXOffset) / 131072.0;
+//   mag_y = ((int32_t)rawY - magYOffset) / 131072.0;
 
-  // Calculate heading from X and Y values
-  float heading_raw = atan2(mag_y, mag_x) / (2 * PI);
+//   // Calculate heading from X and Y values
+//   float heading_raw = atan2(mag_y, mag_x) / (2 * PI);
 
-  // Normalize heading to 0-1 range
-  return normalize(heading_raw, 0.0, 1.0);
-}
+//   // Normalize heading to 0-1 range
+//   return normalize(heading_raw, 0.0, 1.0);
+// }
 
 float calculateW() {  // probably takes more than 310us to get sensor data
   // Get accelerometer data
@@ -325,7 +330,7 @@ void updatePhaseTracking(float w) {  // whenever called it updated currentPhase 
 
 void MeltybrainDrive1() {
 
-  heading = 3.3; //getHeading();  // magnetometer heading for logging comparison only
+  heading = 3.3;  //getHeading();  // magnetometer heading for logging comparison only
   // Calculate initial angular velocity (w)
   float W = calculateW();
   updatePhaseTracking(W);
@@ -396,6 +401,10 @@ void MeltybrainDrive1() {
     if (currentRPS <= RPS_THRESHOLD) { COLOR = LEDOn * WHITE + LEDOn * GREEN; }  // Add green if below threshold
     leds.setPixel(0, COLOR);
     leds.setPixel(1, COLOR);
+    leds.setPixel(2, COLOR);
+    leds.setPixel(3, COLOR);
+    leds.setPixel(4, COLOR);
+    leds.setPixel(5, COLOR);
     leds.show();
 
     // Capture telemetry data every few iterations
