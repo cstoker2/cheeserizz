@@ -200,3 +200,77 @@ void sendTelemetryOverBT() {
   }
 }
 
+void sendRPMOverBT() {
+  static uint32_t lastRPMSendTime = 0;
+  uint32_t currentTime = millis();
+  
+  // Send RPM data twice per second (every 500ms)
+  if (currentTime - lastRPMSendTime >= 500) {
+    // Calculate RPM from RPS (revolutions per second)
+    float rpm = lastRPS * 60.0;
+    
+    // Send RPM data over Bluetooth (Serial1)
+    //Serial1.print("rpm ");
+    Serial1.println(rpm);
+    
+    // Update last send time
+    lastRPMSendTime = currentTime;
+  }
+}
+
+void sendRecentTelemetryOverBT() {
+  static uint32_t lastTransmissionTime = 0;
+  static bool headerSent = false;
+  
+  // Read channel 10 to check if recent telemetry is requested
+  int telemetryTrigger = ibus.readChannel(9);
+
+  // Only send data if trigger is activated and not too frequent (at least 500ms between updates)
+  if (telemetryTrigger > 1300 && (millis() - lastTransmissionTime > 500)) {
+    // Calculate the index of the most recent data point
+    uint16_t recentIndex;
+    if (telemetryBufferCount == 0) {
+      // No data available yet
+      return;
+    } else {
+      // Get most recent entry (one position before the current write position)
+      recentIndex = (telemetryBufferIndex == 0) ? 
+                    (TELEMETRY_BUFFER_SIZE - 1) : 
+                    (telemetryBufferIndex - 1);
+    }
+
+    // Send header with only the fields we're using
+    if (!headerSent || (millis() - lastTransmissionTime > 5000)) {
+      Serial1.println("RECENT_TELEM_FORMAT,timestamp,rpm,radius,kalmanQ,stickAngle,stickLength,throttle,zAccelG,hotLoopCount");
+      headerSent = true;
+    }
+
+    // Get the most recent telemetry data entry
+    TelemetryData* data = &telemetryBuffer[recentIndex];
+
+    // Send telemetry data record with only the fields we're using
+    Serial1.print("RECENT_TELEM,");
+    Serial1.print(data->timestamp); // timestamp
+    Serial1.print(",");
+    Serial1.print(data->fl1, 1);    // rpm
+    Serial1.print(",");
+    Serial1.print(data->fl2, 4);    // radius
+    Serial1.print(",");
+    Serial1.print(data->fl3, 4);    // kalmanQ
+    Serial1.print(",");
+    Serial1.print(data->fl4, 4);    // stickAngle
+    Serial1.print(",");
+    Serial1.print(stickLength, 4);  // stickLength (current value, not from telemetry)
+    Serial1.print(",");
+    Serial1.print(data->fl5, 4);    // throttle
+    Serial1.print(",");
+    Serial1.print(data->fl6, 4);    // zAccelG
+    Serial1.print(",");
+    Serial1.print(data->int1);      // hotLoopCount
+
+    Serial1.println();
+
+    // Update last transmission time
+    lastTransmissionTime = millis();
+  }
+}

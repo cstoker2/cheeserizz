@@ -256,7 +256,7 @@ float calculateW() {  // probably takes more than 310us to get sensor data
 
   // 1. Validate raw Z-axis acceleration
   if (isnan(s.acceleration.z) || isinf(s.acceleration.z)) {
-    DEBUG_PRINTF(" Bad Z-accel: %.2f (X=%.2f, Y=%.2f)\n", s.acceleration.z, s.acceleration.x, s.acceleration.y);
+    //DEBUG_PRINTF(" Bad Z-accel: %.2f (X=%.2f, Y=%.2f)\n", s.acceleration.z, s.acceleration.x, s.acceleration.y);
     return RPS_THRESHOLD * 2 * PI;  // Return safe value in radians/sec
   }
 
@@ -269,13 +269,13 @@ float calculateW() {  // probably takes more than 310us to get sensor data
 
   // 4. Check accelerometer data after filtering
   if ((spinAccel <= 0) || isnan(spinAccel) || isinf(spinAccel)) {
-    DEBUG_PRINTF(" Invalid accel data: %1.2f\n", spinAccel);
+    //DEBUG_PRINTF(" Invalid accel data: %1.2f\n", spinAccel);
     return RPS_THRESHOLD * 2 * PI;  // Fallback to safe value in radians/sec
   }
 
   // 5. Check radius size
   if (radiusSize <= 0 || isnan(radiusSize) || isinf(radiusSize)) {
-    DEBUG_PRINTF(" Invalid radius: %.4f\n", radiusSize);
+    //DEBUG_PRINTF(" Invalid radius: %.4f\n", radiusSize);
     return RPS_THRESHOLD * 2 * PI;  // Fallback to safe value in radians/sec
   }
 
@@ -330,7 +330,7 @@ void updatePhaseTracking(float w) {  // whenever called it updated currentPhase 
 
 void MeltybrainDrive1() {
 
-  heading = 3.3;  //getHeading();  // magnetometer heading for logging comparison only
+  heading = 3.333;  //getHeading();  // magnetometer heading for logging comparison only
   // Calculate initial angular velocity (w)
   float W = calculateW();
   updatePhaseTracking(W);
@@ -352,7 +352,7 @@ void MeltybrainDrive1() {
 
     // Exit conditions
     if (throttle < ZERO_THROTTLE_THRESHOLD || (currentTimeMicros - usLoopStartTime) > 2000000) {
-      DEBUG_PRINTLN(" Throttle zero or Timeout");
+      //DEBUG_PRINTLN(" Throttle zero or Timeout");
       break;
     }
 
@@ -408,22 +408,45 @@ void MeltybrainDrive1() {
     leds.show();
 
     // Capture telemetry data every few iterations
-    if (hotLoopCount % 4 == 0) {
+    if (hotLoopCount % 50 == 0) {
+      sensors_event_t s;
+      accel.getEvent(&s);
+      float zAcceleration = s.acceleration.z;       // Z acceleration in m/s²
+      float zAccelerationG = zAcceleration / 9.81;  // Convert to G's
+
+      // Calculate RPM from RPS
+      float rpm = currentRPS * 60.0;
+
       captureTelemetryData(
-        heading,          // fl1: MagHeading (0-1)
-        continuousPhase,  // fl2: AccelerometerPhase(0-1)
-        forwardPhase,     // fl3: phase + stick
-        backwardPhase,    // fl4: phase + stick + 0.5
-        ledPhase,         // fl5: phase difference for led
-        ledOffset,        // fl6: led offset
-        cos_ph1,          // fl7: cosine of m1 phase
-        stickAngle,       // fl8: stickAngle
-        currentRPS,       // fl9: RPS
-        throttle,         // fl10: throttle
-        hotLoopCount,     // int1: iteration count in hot loop
-        LEDOn ? 1 : 0,    // int2: LED state (1=on, 0=off)
-        0                 // int3: unused
+        rpm,             // fl1: RPM
+        radiusSize,      // fl2: Radius
+        kalmanQ,         // fl3: Kalman Q value
+        stickAngle,      // fl4: Stick angle
+        throttle,        // fl5: Throttle
+        zAccelerationG,  // fl6: Z acceleration in G's
+        stickLength,     // fl7: Stick length
+        0.0,             // fl8: empty
+        0.0,             // fl9: empty
+        0.0,             // fl10: empty
+        hotLoopCount,    // int1: Iteration count in hot loop
+        0,               // int2: empty
+        0                // int3: empty
       );
+      // captureTelemetryData(
+      //     heading,          // fl1: MagHeading (0-1)
+      //     continuousPhase,  // fl2: AccelerometerPhase(0-1)
+      //     forwardPhase,     // fl3: phase + stick
+      //     backwardPhase,    // fl4: phase + stick + 0.5
+      //     ledPhase,         // fl5: phase difference for led
+      //     ledOffset,        // fl6: led offset
+      //     cos_ph1,          // fl7: cosine of m1 phase
+      //     stickAngle,       // fl8: stickAngle
+      //     currentRPS,       // fl9: RPS
+      //     throttle,         // fl10: throttle
+      //     hotLoopCount,     // int1: iteration count in hot loop
+      //     LEDOn ? 1 : 0,    // int2: LED state (1=on, 0=off)
+      //     0                 // int3: unused
+      //   );
     }
   }
 
@@ -433,7 +456,7 @@ void MeltybrainDrive1() {
 void loop() {
   ibus.loop();
 
-  while (!rc_signal_is_healthy()) {
+  while (!rc_signal_is_healthy()) {  // handle failsafe
     setRGB(LED_PATTERN_RADIO_ERROR);
     ibus.loop();
     setThrottle(0, 0);
@@ -442,8 +465,10 @@ void loop() {
 
   updateInputs();
 
-  sendMagDataOverBT();    // Controlled by channel 9
-  sendTelemetryOverBT();  // Controlled by channel 8
+  //sendRPMOverBT();  // Send RPM data twice per second
+  //sendMagDataOverBT();    // Controlled by channel 9
+  //sendTelemetryOverBT();  // Controlled by channel 8
+  sendRecentTelemetryOverBT();  // Send most recent telemetry data only ch 9
 
   bool meltyMode = (throttle > ZERO_THROTTLE_THRESHOLD);
   bool tankMode = (throttle < ZERO_THROTTLE_THRESHOLD);

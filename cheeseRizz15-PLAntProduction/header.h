@@ -37,21 +37,39 @@ uint16_t telemetryBufferIndex = 0;
 uint16_t telemetryBufferCount = 0;
 
 // String constants for telemetry field labels
+// const char* telemetryLabels[] = {
+//   "timestamp",
+//   "magHeading",         // fl1: Magnetometer heading (0-1)
+//   "accelPhase",         // fl2: Phase calculated from accelerometer (0-1)
+//   "forwardPhase",       // fl3: phase + stick
+//   "backwardPhase",      // fl4: phase + stick + 0.5
+//   "ledPhase",           // fl5: phase difference for led
+//   "ledOffset",          // fl6: led offset value
+//   "cos_ph1",            // fl7: cosine of motor 1 phase 
+//   "stickAngle",         // fl8: Stick angle input
+//   "currentRPS",         // fl9: Current Revolutions Per Second
+//   "throttle",           // fl10: Throttle value (0-1)
+//   "hotLoopCount",       // int1: Iteration count in hot loop
+//   "LEDOn",              // int2: LED state (1=on, 0=off)
+//   "unused"              // int3: Currently unused
+// };
+
+// String constants for telemetry field labels
 const char* telemetryLabels[] = {
   "timestamp",
-  "magHeading",         // fl1: Magnetometer heading (0-1)
-  "accelPhase",         // fl2: Phase calculated from accelerometer (0-1)
-  "forwardPhase",       // fl3: phase + stick
-  "backwardPhase",      // fl4: phase + stick + 0.5
-  "ledPhase",           // fl5: phase difference for led
-  "ledOffset",          // fl6: led offset value
-  "cos_ph1",            // fl7: cosine of motor 1 phase 
-  "stickAngle",         // fl8: Stick angle input
-  "currentRPS",         // fl9: Current Revolutions Per Second
-  "throttle",           // fl10: Throttle value (0-1)
-  "hotLoopCount",       // int1: Iteration count in hot loop
-  "LEDOn",              // int2: LED state (1=on, 0=off)
-  "unused"              // int3: Currently unused
+  "rpm",               // fl1: RPM (Revolutions Per Minute)
+  "radius",            // fl2: Radius size in meters
+  "kalmanQ",           // fl3: Kalman Q parameter
+  "stickAngle",        // fl4: Stick angle input
+  "throttle",          // fl5: Throttle value (0-1)
+  "zAccelG",           // fl6: Z acceleration in G's
+  "stickLength",       // fl7: Stick length
+  "unused8",           // fl8: Unused
+  "unused9",           // fl9: Unused
+  "unused10",          // fl10: Unused
+  "hotLoopCount",      // int1: Iteration count in hot loop
+  "unused_int2",       // int2: Unused
+  "unused_int3"        // int3: Unused
 };
 
 // Magnetometer data structure
