@@ -1,38 +1,34 @@
 /* Error messages:
 
-entry 0x400805f0
+SD Card Mounted Successfully
 Writing file: /hello.txt
 Appending to file: /hello.txt
 .Reading file: /lognum.txt
 Writing file: /lognum.txt
-Writing file: /FN0046robot.txt
-i=0 0.929, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
-i=46 1.180, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
-i=92 1.430, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
-i=138 1.680, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
-i=184 1.930, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
-i=230 2.180, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
-i=276 2.430, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
-i=322 2.680, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
-i=368 2.930, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
-i=414 3.180, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
-i=460 3.438,15.2, 1.0, 0.0,1500,1500,15.00,   0,14.8
-i=507 3.689,15.2, 1.0, 0.0,1500,1500,15.00,   0, 4.0
-i=554 3.947,15.2, 1.0, 0.0,1500,1500,15.00,   0,-3.7
-i=601 4.199,15.2, 1.0, 0.0,1500,1500,15.00,   0,-19.0
-i=649 4.457,15.2, 1.0, 0.0,1500,1500,15.00,   0,15.5
-i=696 4.709,15.2, 1.0, 0.0,1500,1500,15.00,   0,-22.9
-i=744 4.972,15.2, 1.0, 0.0,1500,1500,15.00,   0,11.6
-i=791 5.229,15.2, 1.0, 0.0,1500,1500,15.00,   0,11.6
-i=838 5.482,15.2, 1.0, 0.0,1500,1500,15.00,   0,11.6
-Appending to file: /FN0049robot.txt
+Writing file: /FN0052robot.txt
+SD write task created successfully on Core 0
+Setup complete
+SD Write Task started on core: 0
+LocalBufLen=0 0.929, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
+LocalBufLen=46 1.180, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
+LocalBufLen=92 1.430, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
+LocalBufLen=138 1.680, 0.0, 0.0, 0.0,   0,   0,0.00,   0, 0.0
+...
+LocalBufLen=791 5.231,15.2, 1.0, 0.0,1500,1500,15.00,   0,10.0
+LocalBufLen=838 5.484,15.2, 1.0, 0.0,1500,1500,15.00,   0,-16.9
+Appending to file: /FN0052robot.txt
+Guru Meditation Error: Core  0 panic'ed (LoadStoreAlignment). Exception was unhandled.
 
-assert failed: xQueueSemaphoreTake queue.c:1549 (pxQueue->uxItemSize == 0)
+Core  0 register dump:
+PC      : 0x400904d4  PS      : 0x00060933  A0      : 0x8008e325  A1      : 0x3ffd7400  
+A2      : 0x6568434d  A3      : 0xb33fffff  A4      : 0x0000abab  A5      : 0x00060923  
+A6      : 0x00060920  A7      : 0x0000cdcd  A8      : 0x0000cdcd  A9      : 0xffffffff  
+A10     : 0x00000003  A11     : 0x00060923  A12     : 0x00060920  A13     : 0x3ffc4654  
+A14     : 0x25e8434d  A15     : 0x003fffff  SAR     : 0x00000020  EXCCAUSE: 0x00000009  
+EXCVADDR: 0x6568434d  LBEG    : 0x4008ab41  LEND    : 0x4008ab51  LCOUNT  : 0xfffffffb  
 
 
-Backtrace: 0x40083731:0x3ffb1a50 0x4008d22d:0x3ffb1a70 0x40092709:0x3ffb1a90 0x4008e23d:0x3ffb1bc0 0x400d6600:0x3ffb1c00 0x400d881b:0x3ffb1c30 0x400d8bcd:0x3ffb1c60 0x40102dfa:0x3ffb1c90 0x40103101:0x3ffb1cb0 0x4010509b:0x3ffb1cf0 0x4010699f:0x3ffb1f60 0x400e62e6:0x3ffb20d0 0x40149981:0x3ffb20f0 0x400d72ef:0x3ffb2110 0x400d6929:0x3ffb2190 0x400d2c7a:0x3ffb21c0 0x400d2f5e:0x3ffb2200 0x400dc115:0x3ffb2290
-
-
+Backtrace: 0x400904d1:0x3ffd7400 0x4008e322:0x3ffd7440 0x400d6820:0x3ffd7480 0x400d8a3b:0x3ffd74b0 0x400d8ded:0x3ffd74e0 0x401030be:0x3ffd7510 0x401033c5:0x3ffd7530 0x4010535f:0x3ffd7570 0x40106c63:0x3ffd77e0 0x400e65aa:0x3ffd7950 0x40149c45:0x3ffd7970 0x400d750f:0x3ffd7990 0x400d6b49:0x3ffd7a10 0x400d2f2a:0x3ffd7a40 0x400d30b1:0x3ffd7a80
 
 
 */
