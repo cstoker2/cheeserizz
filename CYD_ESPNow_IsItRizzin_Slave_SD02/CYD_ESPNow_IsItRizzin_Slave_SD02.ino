@@ -9,6 +9,9 @@
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 
 // ----------------------------
 // SD Reader pins (default VSPI pins)
@@ -58,7 +61,7 @@ bool newLogLine = false;  // track when line needs appending
 
 int i = 0;  //ram buffer length indicator
 
-portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+SemaphoreHandle_t sdMutex;
 
 void readFile(fs::FS &fs, const char *path) {
   Serial.printf("Reading file: %s\n", path);
@@ -157,6 +160,7 @@ void setup() {
     Serial.println("Card Mount Failed");
     return;
   }
+  sdMutex = xSemaphoreCreateMutex();
 
   // testing SD write / appends ....
   char hlotxt[20] = "/hello.txt";
@@ -217,26 +221,33 @@ void loop() {
       Serial.print(" ");
       Serial.print(dataString);
     }
+
     if (i <= 850) {  // add lines to buffer untill it's mostly full
       i += sprintf(buffer + i, dataString);
       dataString[0] = '\0';  // reset datastring
     }
 
-    if (i > 850) {                           // write headers and buffer to SD card when mostly  full
+    if (i > 850) {                           // write headers and buffer to SD card when mostly full
       i += sprintf(buffer + i, dataString);  // store current values to buffer
-       dataString[0] = '\0';  // reset datastring
-      sprintf(dataString, "time,%s,%s,%s,%s,%s,%s,%s,%s\n", logger.getLabel(0), logger.getLabel(1), logger.getLabel(2), logger.getLabel(3), logger.getLabel(4), logger.getLabel(5), logger.getLabel(6), logger.getLabel(7)); // set datastring to labels
+      dataString[0] = '\0';                  // reset datastring
+
+      sprintf(dataString, "time,%s,%s,%s,%s,%s,%s,%s,%s\n",
+              logger.getLabel(0), logger.getLabel(1), logger.getLabel(2),
+              logger.getLabel(3), logger.getLabel(4), logger.getLabel(5),
+              logger.getLabel(6), logger.getLabel(7));
+
       i += sprintf(buffer + i, dataString);  // store labels to buffer
-      dataString[0] = '\0'; // reset datastring
-      //appendFile(SD, "/hello.txt", "testing ... \n");
-      portENTER_CRITICAL(&mux);  // writing to sd
-      appendFile(SD, robotLog, "TestWorld!\n");
-      //appendFile(SD, robotLog, buffer);
-      portEXIT_CRITICAL(&mux);
+      dataString[0] = '\0';                  // reset datastring
+
+      // Use proper FreeRTOS semaphore instead of critical section
+      if (xSemaphoreTake(sdMutex, portMAX_DELAY) == pdTRUE) {
+        appendFile(SD, robotLog, buffer);
+        xSemaphoreGive(sdMutex);
+      }
 
       i = 0;
       buffer[0] = '\0';  // set terminator to beginning, wiping out buffer
-      delay(10);         // some delay ?
+      delay(10);         // some delay
     }
   }
 
