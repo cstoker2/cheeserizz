@@ -230,7 +230,8 @@ void loop() {
       dataString[0] = '\0'; // reset datastring
       //appendFile(SD, "/hello.txt", "testing ... \n");
       portENTER_CRITICAL(&mux);  // writing to sd
-      appendFile(SD, robotLog, buffer);
+      appendFile(SD, robotLog, "TestWorld!\n");
+      //appendFile(SD, robotLog, buffer);
       portEXIT_CRITICAL(&mux);
 
       i = 0;
