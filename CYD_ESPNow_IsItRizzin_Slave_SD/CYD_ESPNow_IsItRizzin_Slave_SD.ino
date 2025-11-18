@@ -2,6 +2,7 @@
 //program as esp32 Dev Module
 // This will receive and display telemetry data via ESPnow from the robot
 // logging to SD card, master is usually set to send values 4hz, labels 1/3hz
+// buffer of 10000 writes approx every 45sec.
 
 #include <Arduino.h>
 #include <TFT_eSPI.h>
@@ -47,7 +48,7 @@ bool initialDataReceived = false;
 // Store current title to detect changes
 char currentTitle[MAX_TITLE_LENGTH] = "";
 
-#define SERIAL_LOG_TEST 1
+#define SERIAL_LOG_TEST 0  // output to usb serial for diagnostics
 #define BUFFER_SIZE 10000
 
 int LOG_NUM = 1;
@@ -322,13 +323,13 @@ void loop() {
       //Serial.print(i);
       //Serial.print(" ");
       Serial.print(dataString);
-      if (i <= 0.9*BUFFER_SIZE) {  // add lines to buffer untill it's 90% full
+      if (i <= 0.9 * BUFFER_SIZE) {  // add lines to buffer untill it's 90% full
         i += sprintf(buffer + i, dataString);
         dataString[0] = '\0';
       }
 
       if (i > 0.9 * BUFFER_SIZE) {  // write headers and buffer to SD card when more than 90% full
-        //logger.pauseReception();
+        //logger.pauseReception();  // not needed
         i += sprintf(buffer + i, dataString);  //
         sprintf(dataString, "time,%s,%s,%s,%s,%s,%s,%s,%s\n", logger.getLabel(0), logger.getLabel(1), logger.getLabel(2), logger.getLabel(3), logger.getLabel(4), logger.getLabel(5), logger.getLabel(6), logger.getLabel(7));
         i += sprintf(buffer + i, dataString);
@@ -336,7 +337,7 @@ void loop() {
         appendFile(SD, robotLog, buffer);
         i = 0;
         buffer[0] = '\0';  // set terminator to beginning, wiping out buffer
-        //logger.resumeReception();
+        //logger.resumeReception();  // not needed
       }
     }
 
