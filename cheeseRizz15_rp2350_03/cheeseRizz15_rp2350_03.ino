@@ -1,4 +1,4 @@
-//cheeseRizz15_rp2350_02.ino
+//cheeseRizz15_rp2350_03.ino
 #include <PIO_DShot.h>
 #include "CRSFforArduino.hpp"
 #include <Adafruit_NeoPixel.h>
@@ -30,8 +30,8 @@ void setup() {
   Serial.begin(115200);
   Serial2.begin(115200);  // D12 is TX pin on back
   delay(2000);
-  Serial.println("cheeseRizz15_rp2350");
-  telemVal[0] = 15.2;  // bump version number display
+  Serial.println("cheeseRizz_rp2350_03");
+  telemVal[0] = 15.3;  // bump version number display
 
   // Initialise CRSF for Arduino.
   crsf = new CRSFforArduino(&Serial1);  //A0=RX A1=TX on qtrp2040  D6,D7 = Serial1 on rp2350xiao
@@ -316,8 +316,8 @@ void updateInputs() {
     radiusInput = inputPot;
   }
 
-  rudderInput = map(rudderInput, 1000, 2000, -100, 100);
-  radiusSize = map(radiusInput + rudderInput, 1000, 2000, 1500, 3000);  // 1mm to 40mm range
+  rudderInput = map(rudderInput, 1000, 2000, -300, 300);   // rudder can change by =/- 3mm
+  radiusSize = map(radiusInput + rudderInput, 1000, 2000, 2500, 3500);  // 25mm to 35mm range
   radiusSize = radiusSize / 100000.0;
 
   kalmanQ = inputToggleL;  // should be 1000, 1500 or 2000
@@ -477,8 +477,8 @@ void MeltybrainDrive1() {
     float cos_led = cos(ledPhase * 2 * PI);
 
     float widthScale = max(stickLength, throttle);
-    float th1 = max(0, (cos_ph1 * 0.25f * stickLength) + throttle);
-    float th2 = max(0, (cos_ph2 * 0.25f * stickLength) + throttle);
+    float th1 = max(0, (cos_ph1 * TRANSL_STRENGTH * stickLength) + throttle);
+    float th2 = max(0, (cos_ph2 * TRANSL_STRENGTH * stickLength) + throttle);
 
     if (DEBUG_HOTLOOP) {
       Serial.print(" th1:");
@@ -487,9 +487,9 @@ void MeltybrainDrive1() {
     setThrottle(th1, -th2);  // -th2 because of CW spin direction
 
     bool LEDOn = cos_led > 0.7071 * (1.4 - widthScale * 0.9);  // Magic numbers for ~45deg arc
-    uint32_t COLOR = LEDOn * WHITE;
+    uint32_t COLOR = LEDOn * BLUE + LEDOn * GREEN;
     float currentRPS = W / (2 * PI);
-    if (currentRPS <= RPS_THRESHOLD) { COLOR = LEDOn * WHITE + LEDOn * GREEN; }  // Add green if below threshold
+    if (currentRPS <= RPS_THRESHOLD) { COLOR = LEDOn * BLUE; }  // just BLUE if below threshold
     for (int l = 0; l <= NUMPIXELS; l++) { leds.setPixelColor(l, COLOR); }
     leds.show();
   }
@@ -579,14 +579,14 @@ void loop() {
     //pixel.setPixelColor(0, pixel.Color(0, 0, i * 150));  //blink blue led
     i = !i;
     if (DEBUG_TELEMETRY) {
-      //Val0 "CheeseRizz" "15.2";
+      //"CheeseRizz" "15.02";
       telemVal[1] = FAILSAFE;
       telemVal[2] = hotHz;
       telemVal[3] = motor1Throttle;
       telemVal[4] = motor2Throttle;
       telemVal[5] = radiusSize*1000.0;
       telemVal[6] = lastRPS*60.0;
-      telemVal[7] = (accel_event.acceleration.z - accelOffsetZ);
+      telemVal[7] = ledOffset;//(accel_event.acceleration.z - accelOffsetZ);
     }
 
     // send telemetyr data

@@ -82,10 +82,10 @@ void setup() {
 
   // Set custom data transmission intervals
   // Data every 250ms, header every 3 seconds
-  logger.setIntervals(250, 3000);
+  logger.setIntervals(100, 3000);
 
   // Set default title for the display
-  logger.setTitle("Robot Telemetry");
+  logger.setTitle("Bot Rizzin?");
 
   // Set default labels (will be overwritten when received from Serial1)
   logger.setLabel(0, "Value1");

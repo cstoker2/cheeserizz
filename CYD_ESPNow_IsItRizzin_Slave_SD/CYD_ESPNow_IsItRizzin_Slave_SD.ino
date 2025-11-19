@@ -19,6 +19,10 @@
 //#define SD_MOSI 23
 //#define SD_CS 5
 
+#define CYD_LED_BLUE 17  // LED pins
+#define CYD_LED_RED 4
+#define CYD_LED_GREEN 16
+
 // Create the TFT display object
 TFT_eSPI tft = TFT_eSPI();
 
@@ -26,10 +30,10 @@ TFT_eSPI tft = TFT_eSPI();
 ESPNowLogger logger(ESPNowLogger::SLAVE);
 
 // Layout constants
-#define TEXT_SIZE 1     // Small text
-#define VALUE_X 120     // Position for values
-#define ROW_HEIGHT 20   // Height per data row
-#define TITLE_Y 5       // Title position
+#define TEXT_SIZE 2     // Small text
+#define VALUE_X 140     // Position for values
+#define ROW_HEIGHT 30   // Height per data row
+#define TITLE_Y 2       // Title position
 #define FIRST_ROW_Y 30  // First data row position
 
 // Colors
@@ -42,14 +46,14 @@ ESPNowLogger logger(ESPNowLogger::SLAVE);
 
 // For determining connection status
 unsigned long lastUpdateTime = 0;
-const unsigned long CONNECTION_TIMEOUT = 2000;  // 2 seconds without data means disconnected
+const unsigned long CONNECTION_TIMEOUT = 1000;  // 2 seconds without data means disconnected
 bool initialDataReceived = false;
 
 // Store current title to detect changes
 char currentTitle[MAX_TITLE_LENGTH] = "";
 
 #define SERIAL_LOG_TEST 0  // output to usb serial for diagnostics
-#define BUFFER_SIZE 10000
+#define BUFFER_SIZE 10000 // SD logging buffer
 
 int LOG_NUM = 1;
 char numString[4];     // short string for loggin fn
@@ -133,7 +137,7 @@ void drawLayout() {
   drawLabels();
 
   // Draw timestamp area
-  tft.drawLine(0, 190, 240, 190, TFT_DARKGREY);
+  tft.drawLine(0, 276, 240, 276, TFT_DARKGREY);
   updateTimestamp(0);
 
   // Draw initial connection status
@@ -149,11 +153,11 @@ void updateTitle() {
     // Title has changed, update it
 
     // Clear title area
-    tft.fillRect(0, TITLE_Y, 240, 20, COLOR_BACKGROUND);
+    tft.fillRect(0, TITLE_Y, 240, 30, COLOR_BACKGROUND);
 
     // Display new title
     tft.setTextColor(COLOR_TITLE);
-    tft.drawString(newTitle, 20, TITLE_Y, 2);
+    tft.drawString(newTitle, 10, TITLE_Y, 1);
 
     // Save current title
     strncpy(currentTitle, newTitle, MAX_TITLE_LENGTH);
@@ -172,18 +176,15 @@ void clearDataArea() {
 // Update just the values
 void updateValues() {
   tft.setTextColor(COLOR_VALUE, COLOR_BACKGROUND);
+  tft.fillRect(VALUE_X, FIRST_ROW_Y, 120, MAX_DATA_VALUES * ROW_HEIGHT, COLOR_BACKGROUND);  // blank all values area
 
   // Update each telemetry value
   for (int i = 0; i < MAX_DATA_VALUES; i++) {
     float value = logger.getValue(i);
     int y = FIRST_ROW_Y + (i * ROW_HEIGHT);
-
-    // Clear previous value
-    tft.fillRect(VALUE_X, y, 120, 20, COLOR_BACKGROUND);
-
     // Display new value with 1 decimal place
     char valueStr[10];
-    dtostrf(value, 5, 1, valueStr);
+    dtostrf(value, 4, 1, valueStr);
     tft.drawString(valueStr, VALUE_X, y, 2);
   }
 
@@ -196,14 +197,14 @@ void updateValues() {
 void drawLabels() {
   tft.setTextColor(COLOR_LABEL, COLOR_BACKGROUND);
 
+  // Clear previous label
+  tft.fillRect(0, FIRST_ROW_Y, VALUE_X - 10, ROW_HEIGHT * MAX_DATA_VALUES, COLOR_BACKGROUND);
+
   for (int i = 0; i < MAX_DATA_VALUES; i++) {
     int y = FIRST_ROW_Y + (i * ROW_HEIGHT);
 
     // Get label
     const char *label = logger.getLabel(i);
-
-    // Clear previous label
-    tft.fillRect(0, y, VALUE_X - 10, 20, COLOR_BACKGROUND);
 
     // Display label
     tft.drawString(label, 10, y, 2);
@@ -213,7 +214,7 @@ void drawLabels() {
 // Update the timestamp display
 void updateTimestamp(uint32_t timestamp) {
   // Clear timestamp area
-  tft.fillRect(0, 200, 240, 20, COLOR_BACKGROUND);
+  tft.fillRect(0, 277, 240, 30, COLOR_BACKGROUND);
 
   // Format timestamp as seconds.milliseconds
   float seconds = timestamp / 1000.0;
@@ -222,9 +223,10 @@ void updateTimestamp(uint32_t timestamp) {
 
   // Display timestamp
   tft.setTextColor(COLOR_TIMESTAMP, COLOR_BACKGROUND);
-  tft.drawString("Time: ", 5, 200, 1);
-  tft.drawString(timeStr, 50, 200, 1);
-  tft.drawString("s", 120, 200, 1);
+  tft.drawString("Time: ", 5, 280, 1);
+  tft.drawString(timeStr, 60, 280, 1);
+  tft.drawString("s", 120, 280, 1);
+  tft.drawString(robotLog, 20, 300, 1);
 }
 
 // Update the connection status indicator
@@ -232,13 +234,17 @@ void updateConnectionStatus() {
   bool connected = logger.isConnected() && (millis() - lastUpdateTime < CONNECTION_TIMEOUT);
 
   // Clear status area
-  tft.fillRect(200, 5, 30, 15, COLOR_BACKGROUND);
+  tft.fillRect(229, 5, 30, 15, COLOR_BACKGROUND);
 
   // Draw status indicator
   if (connected) {
-    tft.fillCircle(215, 10, 5, TFT_GREEN);
+    tft.fillCircle(230, 10, 5, TFT_GREEN);
+    digitalWrite(CYD_LED_RED, HIGH);
+    digitalWrite(CYD_LED_GREEN, LOW);
   } else {
-    tft.fillCircle(215, 10, 5, COLOR_CONNECTION);
+    tft.fillCircle(230, 10, 5, COLOR_CONNECTION);
+    digitalWrite(CYD_LED_RED, LOW);
+    digitalWrite(CYD_LED_GREEN, HIGH);
   }
 }
 
@@ -252,7 +258,16 @@ void setup() {
 
   // Display initial title (will be updated when header is received)
   tft.setTextColor(COLOR_TITLE);
-  tft.drawString("Waiting for Master...", 20, TITLE_Y, 2);
+  tft.drawString("Awaiting Master", 20, TITLE_Y, 1);
+
+  pinMode(CYD_LED_RED, OUTPUT);
+  pinMode(CYD_LED_GREEN, OUTPUT);
+  pinMode(CYD_LED_BLUE, OUTPUT);
+
+  //Turn LED Off
+  digitalWrite(CYD_LED_RED, HIGH);  // The LEDs are "active low", meaning HIGH == off, LOW == on
+  digitalWrite(CYD_LED_GREEN, HIGH);
+  digitalWrite(CYD_LED_BLUE, HIGH);
 
   // Initialize the logger
   if (!logger.begin()) {
@@ -266,15 +281,12 @@ void setup() {
   // Draw initial layout with placeholder values
   drawLayout();
 
-  delay(5000);
+  delay(1000);
 
   if (!SD.begin(SS, spiSD, 8000000)) {
     Serial.println("Card Mount Failed");
     return;
   }
-
-  writeFile(SD, "/hello.txt", "Hello ");
-  appendFile(SD, "/hello.txt", "World!\n");
 
   LOG_NUM = read3File(SD, "/lognum.txt");  // desired release height in ft in text file
   LOG_NUM++;
@@ -285,7 +297,7 @@ void setup() {
 
   sprintf(numString, "%04d", LOG_NUM);
   writeFile(SD, "/lognum.txt", numString);         // store logfile index number
-  sprintf(robotLog, "/FN%04drobot.txt", LOG_NUM);  // robotlog is log pathname
+  sprintf(robotLog, "/FN%04drobot.csv", LOG_NUM);  // robotlog is log pathname
   sprintf(dataString, "LogNum: %d\n", LOG_NUM);
   writeFile(SD, robotLog, dataString);  // header for file
 }
@@ -323,27 +335,28 @@ void loop() {
       //Serial.print(i);
       //Serial.print(" ");
       Serial.print(dataString);
-      if (i <= 0.9 * BUFFER_SIZE) {  // add lines to buffer untill it's 90% full
-        i += sprintf(buffer + i, dataString);
-        dataString[0] = '\0';
-      }
-
-      if (i > 0.9 * BUFFER_SIZE) {  // write headers and buffer to SD card when more than 90% full
-        //logger.pauseReception();  // not needed
-        i += sprintf(buffer + i, dataString);  //
-        sprintf(dataString, "time,%s,%s,%s,%s,%s,%s,%s,%s\n", logger.getLabel(0), logger.getLabel(1), logger.getLabel(2), logger.getLabel(3), logger.getLabel(4), logger.getLabel(5), logger.getLabel(6), logger.getLabel(7));
-        i += sprintf(buffer + i, dataString);
-        dataString[0] = '\0';
-        appendFile(SD, robotLog, buffer);
-        i = 0;
-        buffer[0] = '\0';  // set terminator to beginning, wiping out buffer
-        //logger.resumeReception();  // not needed
-      }
     }
 
-    // Check connection status
-    updateConnectionStatus();
+    if (i <= 0.9 * BUFFER_SIZE) {  // add lines to buffer untill it's 90% full
+      i += sprintf(buffer + i, dataString);
+      dataString[0] = '\0';
+    }
 
-    delay(10);  // Short delay to prevent loop from running too fast
+    if (i > 0.9 * BUFFER_SIZE) {  // write headers and buffer to SD card when more than 90% full
+      //logger.pauseReception();  // not needed
+      i += sprintf(buffer + i, dataString);  //
+      sprintf(dataString, "time,%s,%s,%s,%s,%s,%s,%s,%s\n", logger.getLabel(0), logger.getLabel(1), logger.getLabel(2), logger.getLabel(3), logger.getLabel(4), logger.getLabel(5), logger.getLabel(6), logger.getLabel(7));
+      i += sprintf(buffer + i, dataString);
+      dataString[0] = '\0';
+      appendFile(SD, robotLog, buffer);
+      i = 0;
+      buffer[0] = '\0';  // set terminator to beginning, wiping out buffer
+      //logger.resumeReception();  // not needed
+    }
   }
+
+  // Check connection status
+  updateConnectionStatus();
+
+  delay(10);  // Short delay to prevent loop from running too fast
 }
