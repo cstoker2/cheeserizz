@@ -85,7 +85,7 @@ void setup() {
   logger.setIntervals(100, 3000);
 
   // Set default title for the display
-  logger.setTitle("Bot Rizzin?");
+  logger.setTitle("CheeseRizz 10/0.33");
 
   // Set default labels (will be overwritten when received from Serial1)
   logger.setLabel(0, "Value1");

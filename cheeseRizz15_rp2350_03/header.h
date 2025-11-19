@@ -1,12 +1,12 @@
 //DEBUGGING
-#define CRSF_DEBUG 0    // show all crf channels on serial
-#define DEBUG_HOTLOOP 0 // debugs in calculateW, other melty loop unctions
-#define DEBUG_HOTHZ 1 // debugs counts hz of loop
-#define DEBUG_SERIAL 1  // Serial debug output toggle
-#define DEBUG2_SERIAL 0  // Serial debug output toggle
-#define DEBUG_TIMERS 0  // Serial debug output toggle
-#define DEBUG_ACCEL 1  // Serial debug output toggle
-#define DEBUG_TELEMETRY 1 // send serial2 data for espnow module
+#define CRSF_DEBUG 0       // show all crf channels on serial
+#define DEBUG_HOTLOOP 0    // debugs in calculateW, other melty loop unctions
+#define DEBUG_HOTHZ 1      // debugs counts hz of loop
+#define DEBUG_SERIAL 1     // Serial debug output toggle
+#define DEBUG2_SERIAL 0    // Serial debug output toggle
+#define DEBUG_TIMERS 0     // Serial debug output toggle
+#define DEBUG_ACCEL 1      // Serial debug output toggle
+#define DEBUG_TELEMETRY 1  // send serial2 data for espnow module
 
 //#define PIN_LED 25 // D19 xiao, LOW = on this is in the board definition
 #define NEOPIXEL_BUILTIN 22
@@ -28,15 +28,15 @@
 #define DSHOT2_PIN 27  //D1 xiao2350
 
 //Interrupt timers
-#define ACCEL_IRQ_INTERVAL 1 // interrupt in ms 1000hz
-#define DSHOT_IRQ_INTERVAL 1.6 // interrupt in ms 625hz
-#define LED_IRQ_INTERVAL 100 // interrupt in ms 10hz
+#define ACCEL_IRQ_INTERVAL 1    // interrupt in ms 1000hz
+#define DSHOT_IRQ_INTERVAL 1.6  // interrupt in ms 625hz
+#define LED_IRQ_INTERVAL 100    // interrupt in ms 10hz
 
 // Motor direction constants
 #define MOTOR1_DIRECTION -1.0   // Set to -1 to reverse motor 1, 1 for normal LEFT
-#define MOTOR2_DIRECTION 1.0   // Set to -1 to reverse motor 2, 1 for normal  RIGHT
+#define MOTOR2_DIRECTION 1.0    // Set to -1 to reverse motor 2, 1 for normal  RIGHT
 #define HEADING_SMOOTHING 0.85  // Smoothing factor for heading updates (0-1)
-#define TRANSL_STRENGTH 0.75f  // phase strength multiplier base was 0.25f. 0.5 was ok. Try 0.75?
+#define TRANSL_STRENGTH 0.75f   // phase strength multiplier base was 0.25f. 0.5 was ok. Try 0.75?
 
 //colors: rgb
 #define RED 0xFF0000
@@ -59,22 +59,22 @@
 //Variables:
 int rcChannelCount = crsfProtocol::RC_CHANNEL_COUNT;
 const char *rcChannelNames[] = {
-  "A",  //1
-  "E",  //2
-  "T",  //3
-  "R",  //4
-  "--",  //5 sA
-  "sB",  //6 sB
-  "sC",  //7 sC
-  "p1",  //8 sD
-  "sE",
-  "p1",  //
-  "Aux7",
-  "Aux8",
-  "Aux9",
-  "Aux10",
-  "Aux11",
-  "Aux12"
+  "A",      //1
+  "E",      //2
+  "T",      //3
+  "R",      //4
+  "--",     //5
+  "sB",     //6
+  "sC",     //7
+  "p1",     //8
+  "sE",     //9
+  "Aux6",   //10
+  "Aux7",   //11
+  "Aux8",   //12
+  "Aux9",   //13
+  "Aux10",  //14
+  "Aux11",  //15
+  "Aux12"   //16
 };
 bool FAILSAFE = true;  //global failsafe variable, set in onRecieveChannels
 uint32_t rpm = 0;
@@ -84,7 +84,7 @@ uint16_t pulse = 0;  // pulse led
 float accelOffsetX;
 float accelOffsetY;
 float accelOffsetZ;
-float estimated_accel;  // for kalman filter
+float estimated_accel;            // for kalman filter
 volatile uint32_t hotMicros = 0;  // dshot interrupt microseconds
 volatile float hotHz = 0;
 sensors_event_t accel_event;
@@ -114,21 +114,24 @@ volatile float lastRPS = 0.0;      // stored for logging
 //const unsigned long LOOP_DELAY_MICROS = 200;  // Delay for each loop iteration in microseconds
 
 // Variables to store inputs
-volatile float stickVert = 0.0;      // up/down = ch0
-volatile float stickHoriz = 0.0;     // left/right = ch1
-volatile float stickAngle = 0.0;     // Stick angle as a fraction of a circle
-volatile float stickLength = 0.0;    // Length of the stick vector
-volatile float throttle = 0.0;       // Throttle input = ch2
+volatile float stickVert = 0.0;    // up/down = ch0
+volatile float stickHoriz = 0.0;   // left/right = ch1
+volatile float stickAngle = 0.0;   // Stick angle as a fraction of a circle
+volatile float stickLength = 0.0;  // Length of the stick vector
+volatile float throttle = 0.0;     // Throttle input = ch2
 //volatile float sidewaysInput = 0.0;  // Sideways input = ch7 right toggle for tank drive
-volatile float rudderInput = 0.0;    // rudder input = ch3
-volatile float radiusInput = 0.0;    // Radius input = ch4
-volatile float radiusSize = 0.01;    // Mapped radius size in meters
-volatile float ledOffset = 0.0;      // offset leds from 12 o'clock
-volatile float kalmanQ = 0.01;       // rateparam for kalman
-volatile float kalmanInput = 0.0;    // input placeholder
-volatile float inputPot = 0.0;       // ch7 right potentiometer
-volatile float inputToggleL = 0.0;    // ch5 left 3-way toggle
-volatile float inputToggleR = 0.0;    // ch6 right 3-way toggle
+volatile float rudderInput = 0.0;   // rudder input = ch3
+volatile float radiusInput = 0.0;   // Radius input = ch4
+volatile float radiusSize = 0.01;   // Mapped radius size in meters
+volatile float ledOffset = 0.0;     // offset leds from 12 o'clock
+volatile float kalmanQ = 0.01;      // rateparam for kalman
+volatile float kalmanInput = 0.0;   // input placeholder
+volatile float inputPot = 0.0;      // ch7 right potentiometer
+volatile float inputToggleL = 0.0;  // ch5 left 3-way toggle
+volatile float inputToggleR = 0.0;  // ch6 right 3-way toggle
+
+volatile float aux6 = 0.0;  // ch10
+volatile float aux7 = 0.0;  // ch11
 
 // Phase tracking variables
 static float continuousPhase = 0.0f;       // Current phase position (0.0-1.0)
@@ -146,14 +149,14 @@ volatile uint8_t bbit;
 
 //Telemetry Labels
 const char *telemLbl[] = {
-  "CheeseRizz",  // f1: , version number
-  "Failsafe",      // fl2:
+  "radiusmm",    // f1: , version number
+  "LEDoffs",     // fl2:
   "hotHZ",       //fl3:
-  "m1Throttle",      // fl4:
-  "m2Throttle",      // fl5:
-  "radmm",      // fl6:
-  "rpm",      // fl7:
-  "ledOffset"      // fl8:
+  "m1Th",  // fl4:
+  "aux6",  // fl5:
+  "FailSafe",    // fl6:
+  "rpm",         // fl7:
+  "accelX"       // fl8:
 };
 //telemetry Values
 volatile float telemVal[] = {

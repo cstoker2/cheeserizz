@@ -53,7 +53,7 @@ bool initialDataReceived = false;
 char currentTitle[MAX_TITLE_LENGTH] = "";
 
 #define SERIAL_LOG_TEST 0  // output to usb serial for diagnostics
-#define BUFFER_SIZE 10000 // SD logging buffer
+#define BUFFER_SIZE 5000 // SD logging buffer
 
 int LOG_NUM = 1;
 char numString[4];     // short string for loggin fn
@@ -184,7 +184,7 @@ void updateValues() {
     int y = FIRST_ROW_Y + (i * ROW_HEIGHT);
     // Display new value with 1 decimal place
     char valueStr[10];
-    dtostrf(value, 4, 1, valueStr);
+    dtostrf(value, 4, 2, valueStr);
     tft.drawString(valueStr, VALUE_X, y, 2);
   }
 
@@ -320,7 +320,7 @@ void loop() {
     lastUpdateTime = millis();
     updateValues();
     needsRefresh = true;
-    sprintf(dataString, "%4.3f,%4.1f,%4.1f,%4.1f,%4.0f,%4.0f,%3.2f,%4.0f,%4.1f\n", logger.getLastTimestamp() / 1000.0, logger.getValue(0), logger.getValue(1), logger.getValue(2), logger.getValue(3), logger.getValue(4), logger.getValue(5), logger.getValue(6), logger.getValue(7));
+    sprintf(dataString, "%4.3f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f\n", logger.getLastTimestamp() / 1000.0, logger.getValue(0), logger.getValue(1), logger.getValue(2), logger.getValue(3), logger.getValue(4), logger.getValue(5), logger.getValue(6), logger.getValue(7));
     newLogLine = true;
 
     if (!initialDataReceived) {

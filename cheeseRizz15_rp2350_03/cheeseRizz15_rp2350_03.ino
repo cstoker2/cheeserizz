@@ -31,7 +31,7 @@ void setup() {
   Serial2.begin(115200);  // D12 is TX pin on back
   delay(2000);
   Serial.println("cheeseRizz_rp2350_03");
-  telemVal[0] = 15.3;  // bump version number display
+  //telemVal[0] = 15.3;  // bump version number display
 
   // Initialise CRSF for Arduino.
   crsf = new CRSFforArduino(&Serial1);  //A0=RX A1=TX on qtrp2040  D6,D7 = Serial1 on rp2350xiao
@@ -221,7 +221,6 @@ void setThrottle(float throttle1, float throttle2) {
 
   motor1Throttle = throttleToPWM(throttle1 * MOTOR1_DIRECTION);
   motor2Throttle = throttleToPWM(throttle2 * MOTOR2_DIRECTION);
-  
 }
 
 int throttleToPWM(float throttle) {
@@ -316,7 +315,7 @@ void updateInputs() {
     radiusInput = inputPot;
   }
 
-  rudderInput = map(rudderInput, 1000, 2000, -300, 300);   // rudder can change by =/- 3mm
+  rudderInput = map(rudderInput, 1000, 2000, -300, 300);                // rudder can change by =/- 3mm
   radiusSize = map(radiusInput + rudderInput, 1000, 2000, 2500, 3500);  // 25mm to 35mm range
   radiusSize = radiusSize / 100000.0;
 
@@ -326,6 +325,12 @@ void updateInputs() {
   kalmanQ = map(kalmanQ, 1000, 2000, 0, 3);
   kalmanQ = 0.5 + (1.0 / pow(10, kalmanQ));
   kalmanFilter.setProcessNoise(kalmanQ);
+
+  aux6 = crsf->rcToUs(crsf->getChannel(10));
+  aux6 = constrain(aux6, 1000, 2000);
+  aux6 = (aux6 - 950) / 500.0;  // should be 0.1-2.1 float value.
+  aux7 = crsf->rcToUs(crsf->getChannel(11));
+  aux7 = (aux7 - 1000) / 1000.0;  // 0-1.0 float value
 }
 
 void setPattern(uint16_t r, uint16_t g, uint16_t b) {
@@ -446,11 +451,11 @@ void MeltybrainDrive1() {
   while (true) {
     // Get current time
     unsigned long currentTimeMicros = micros();
-  
-  if (DEBUG_HOTHZ) {  // timing this loop
-    hotHz = 1000000.0 / (currentTimeMicros - hotMicros);
-    hotMicros = currentTimeMicros;
-  }
+
+    if (DEBUG_HOTHZ) {  // timing this loop
+      hotHz = 1000000.0 / (currentTimeMicros - hotMicros);
+      hotMicros = currentTimeMicros;
+    }
 
     // Exit conditions
     if (throttle < ZERO_THROTTLE_THRESHOLD || (currentTimeMicros - usLoopStartTime) > 2000000) {
@@ -470,15 +475,18 @@ void MeltybrainDrive1() {
 
     float forwardPhase = normalize(continuousPhase + stickAngle, -0.5, 0.5);
     float backwardPhase = normalize(continuousPhase + stickAngle + 0.5, -0.5, 0.5);
-    float ledPhase = normalize(continuousPhase + stickAngle + ledOffset, -0.5, 0.5);
+    //float ledPhase = normalize(continuousPhase + stickAngle + ledOffset, -0.5, 0.5);
+    float ledPhase = normalize(continuousPhase + ledOffset, -0.5, 0.5);  // try fixed leds
 
     float cos_ph1 = cos(forwardPhase * 2 * PI);
     float cos_ph2 = cos(backwardPhase * 2 * PI);
     float cos_led = cos(ledPhase * 2 * PI);
 
     float widthScale = max(stickLength, throttle);
-    float th1 = max(0, (cos_ph1 * TRANSL_STRENGTH * stickLength) + throttle);
-    float th2 = max(0, (cos_ph2 * TRANSL_STRENGTH * stickLength) + throttle);
+    // float th1 = max(0, (cos_ph1 * TRANSL_STRENGTH * stickLength) + throttle);
+    //float th2 = max(0, (cos_ph2 * TRANSL_STRENGTH * stickLength) + throttle);
+    float th1 = max(0, (cos_ph1 * aux6 * stickLength) + throttle);  // try with adjustable strength pulse
+    float th2 = max(0, (cos_ph2 * aux6 * stickLength) + throttle);
 
     if (DEBUG_HOTLOOP) {
       Serial.print(" th1:");
@@ -531,7 +539,7 @@ void loop() {
 
   delayMicroseconds(200);
 
-  rpm++;                            // eRPM = RPM * poles/2
+  //rpm++;                            // eRPM = RPM * poles/2
   if (millis() - lastTime > 100) {  // run 10hz stuff, mainly display
     lastTime = millis();
     if (DEBUG_TIMERS) {  // serial stuff
@@ -563,7 +571,7 @@ void loop() {
       // Serial.print(inputToggleL);
       Serial.print(" lastRPS: ");
       Serial.print(lastRPS);
-      Serial.printf(" Rmm: %.1f ", radiusSize*1000);
+      Serial.printf(" Rmm: %.1f ", radiusSize * 1000);
       Serial.print(" Led: ");
       Serial.print(ledOffset);
 
@@ -579,14 +587,14 @@ void loop() {
     //pixel.setPixelColor(0, pixel.Color(0, 0, i * 150));  //blink blue led
     i = !i;
     if (DEBUG_TELEMETRY) {
-      //"CheeseRizz" "15.02";
-      telemVal[1] = FAILSAFE;
+      telemVal[0] = radiusSize * 1000.0;
+      telemVal[1] = ledOffset;
       telemVal[2] = hotHz;
       telemVal[3] = motor1Throttle;
-      telemVal[4] = motor2Throttle;
-      telemVal[5] = radiusSize*1000.0;
-      telemVal[6] = lastRPS*60.0;
-      telemVal[7] = ledOffset;//(accel_event.acceleration.z - accelOffsetZ);
+      telemVal[4] = aux6;
+      telemVal[5] = FAILSAFE;
+      telemVal[6] = lastRPS * 60.0;
+      telemVal[7] = (accel_event.acceleration.x - accelOffsetX);
     }
 
     // send telemetyr data
