@@ -1,5 +1,5 @@
 /*
-11-19-25 added aux6 & aux7 inputs for parameter tweaking from radio values.
+11-30-25 added hot loop data collection with telemetry transmission
 11-19-25 NMRC Botsgiving notes: may try TRANSL_STRENGTH of 0.75 to see. Felt like trans was poor, also may try having leds always show fixed heading vs following stick.
 9-28-25 Botbash notes: want to improve translation by adding parameters to knobs to fiddle while driving. Also want to record telemetry data to card.
 8-4-25 driving pretty well, changed radius range 25-35 and make rudder more authoritative +/- 3mm so trim can be used well
