@@ -258,7 +258,7 @@ void setup() {
 
   // Display initial title (will be updated when header is received)
   tft.setTextColor(COLOR_TITLE);
-  tft.drawString("Awaiting Master", 20, TITLE_Y, 1);
+  tft.drawString("Connecting...", 20, TITLE_Y, 1);
 
   pinMode(CYD_LED_RED, OUTPUT);
   pinMode(CYD_LED_GREEN, OUTPUT);

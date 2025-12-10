@@ -1,5 +1,8 @@
 /*
-11-30-25 added hot loop data collection with telemetry transmission
+12-8-25 logging hotloop is working, aux6 is regulating pulse strength edit G1 offset in mix , aux7 trigger and throttle down for data dump w/ 17.17 as magic number value
+want to try changing library to have a packet flag for labels vs data to eliminate duplicate transmission of labels.
+12-1-25 attempt at recording hotloop for later logging telem output.
+11-19-25 added aux6 & aux7 inputs for parameter tweaking from radio values.
 11-19-25 NMRC Botsgiving notes: may try TRANSL_STRENGTH of 0.75 to see. Felt like trans was poor, also may try having leds always show fixed heading vs following stick.
 9-28-25 Botbash notes: want to improve translation by adding parameters to knobs to fiddle while driving. Also want to record telemetry data to card.
 8-4-25 driving pretty well, changed radius range 25-35 and make rudder more authoritative +/- 3mm so trim can be used well

@@ -1,4 +1,4 @@
-//cheeseRizz15_rp2350_03_with_logging.ino
+//cheeseRizz15_rp2350_04.ino
 #include <PIO_DShot.h>
 #include "CRSFforArduino.hpp"
 #include <Adafruit_NeoPixel.h>
@@ -7,7 +7,7 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_DotStar.h>
 #include <SimpleKalmanFilter.h>
-#define TIMER_INTERRUPT_DEBUG 0      // defines add print debugs in isr
+#define TIMER_INTERRUPT_DEBUG 0      // activate print debugs in isr
 #define _TIMERINTERRUPT_LOGLEVEL_ 4  // Don't define _TIMERINTERRUPT_LOGLEVEL_ > 0. Only for special ISR debugging only. Can hang the system.
 #include "RPi_Pico_TimerInterrupt.h"
 #include "header.h"
@@ -30,7 +30,7 @@ void setup() {
   Serial.begin(115200);
   Serial2.begin(115200);  // D12 is TX pin on back
   delay(2000);
-  Serial.println("cheeseRizz_rp2350_03_with_logging");
+  Serial.println("cheeseRizz_rp2350_04");
   //telemVal[0] = 15.3;  // bump version number display
 
   // Initialise CRSF for Arduino.
@@ -232,134 +232,174 @@ int throttleToPWM(float throttle) {
   return (int)pwmFloat;
 }
 
-int pwm2dshot(int pwm_throttle) {
+int pwm2dshot(int pwm_throttle) {  // maps  1500 +/- DEADBAND to 0, (1501,2000) to (0,1000), (1499,1000) to (1000,1999)
   // DShot wants throttle 0 to 1999
+
   // In DShot, any throttle value < 48 is a motor configuration command.
   // The throttle ranges are then 1000 steps wide, from 48 -> 1047 for direction 1 and 1049-2047 for direction 2
   // Yes, this means that we go from full forwards throttle at 1047 to minimum reverse throttle at 1049.
   // Also note, 1048 is not 0! We need to send an actual 0 for 0.
+  // See: https://www.swallenhardware.io/battlebots/2019/4/20/a-developers-guide-to-dshot-escs
 
-  const int DSHOT_DEADBAND = 3;  // pwm above which motors spin
-  const int DSHOT_MIN = 48;
-  const int DSHOT_MID = 1048;
-  const int DSHOT_MAX = 2047;
+  const int DEADBAND = 10;
 
-  if (pwm_throttle >= (1500 + DSHOT_DEADBAND) && pwm_throttle <= 2000) {
-    return map(pwm_throttle, 1500 + DSHOT_DEADBAND, 2000, DSHOT_MIN, DSHOT_MID - 1);
-  } else if (pwm_throttle <= (1500 - DSHOT_DEADBAND) && pwm_throttle >= 1000) {
-    return map(pwm_throttle, 1500 - DSHOT_DEADBAND, 1000, DSHOT_MID + 1, DSHOT_MAX);
-  } else {
-    return 0;  // if within deadband, send 0
+  if ((pwm_throttle <= 1500 + DEADBAND) && (pwm_throttle >= 1500 - DEADBAND)) {
+    return 0;
   }
+
+  if (pwm_throttle > 1500 + DEADBAND) {
+    pwm_throttle = map(pwm_throttle, 1501, 2000, 0, 1000);
+    return min(pwm_throttle, 999);
+    ;
+  }
+
+  // otherwise, pwm_throttle must be less than zero
+  pwm_throttle = map(pwm_throttle, 1000, 1499, 1000, 0);
+  return min((pwm_throttle), 999) + 1000;  //48;
 }
 
-void setPattern(uint16_t r, uint16_t g, uint16_t b) {
-  redState = r;
-  greenState = g;
-  blueState = b;
-}
-
-float normalize(float value, float min, float max) {
-  float range = max - min;
-  while (value < min) value += range;
-  while (value >= max) value -= range;
-  return value;
+float modulateThrottle(float inputThrottle, int idx) {
+  unsigned long now = millis();
+  if (now > endBoost[idx] + 100) {
+    endBoost[idx] = 0;
+    return inputThrottle;
+  }
+  if (now > endBoost[idx] || inputThrottle > boostThreshold) {
+    isBoost[idx] = false;
+    return inputThrottle;
+  }
+  if (endBoost[idx] == 0) {
+    isBoost[idx] = true;
+    endBoost[idx] = now + baseCycleTime;
+  }
+  if (!isBoost[idx]) return inputThrottle;
+  return boostSpeed;
 }
 
 void TankDrive() {
-  float leftSpeed = stickVert + rudderInput;
-  float rightSpeed = stickVert - rudderInput;
+  float x = stickHoriz / 6.0;  // Reduced to 16% for less twitchy steering
+  float y = stickVert / 5.0;
+  float m1 = y + x;  // Left motor
+  float m2 = y - x;  // Right motor
 
-  leftSpeed = constrain(leftSpeed, -1.0, 1.0);
-  rightSpeed = constrain(rightSpeed, -1.0, 1.0);
+  m1 = modulateThrottle(m1, 0);
+  m2 = modulateThrottle(m2, 1);
 
-  setThrottle(leftSpeed, rightSpeed);
+  setThrottle(m1, m2);
 }
 
 void updateInputs() {
-  stickVert = ((crsf->rcToUs(crsf->getChannel(2)) - 1500.0) / 500.0);
-  stickHoriz = ((crsf->rcToUs(crsf->getChannel(1)) - 1500.0) / 500.0);
-  throttle = ((crsf->rcToUs(crsf->getChannel(3)) - 1000.0) / 1000.0);
-  rudderInput = ((crsf->rcToUs(crsf->getChannel(4)) - 1500.0) / 500.0);
-  inputToggleL = ((crsf->rcToUs(crsf->getChannel(5)) - 1000.0) / 1000.0);
-  inputToggleR = ((crsf->rcToUs(crsf->getChannel(6)) - 1000.0) / 1000.0);
-  inputPot = ((crsf->rcToUs(crsf->getChannel(8)) - 1000.0) / 1000.0);
-  aux6 = ((crsf->rcToUs(crsf->getChannel(10)) - 1000.0) / 1000.0);
-  aux7 = ((crsf->rcToUs(crsf->getChannel(11)) - 1000.0) / 1000.0);
+  int horiz = crsf->rcToUs(crsf->getChannel(1));
+  int vert = crsf->rcToUs(crsf->getChannel(2));
 
-  stickLength = sqrt(stickVert * stickVert + stickHoriz * stickHoriz);
-  stickLength = constrain(stickLength, 0.0, 1.0);
-  stickAngle = atan2(stickVert, stickHoriz) / (2.0 * PI);
-  stickAngle = normalize(stickAngle - 0.25, -0.5, 0.5);
+  stickVert = (vert - 1500) / 500.0;
+  stickHoriz = (horiz - 1500) / 500.0;
+  stickAngle = -atan2(stickHoriz, stickVert) / (2 * PI);
+  stickLength = sqrt(sq(stickVert) + sq(stickHoriz));
+  stickLength = min(stickLength, 1.0);
+  if (stickLength < 0.05) {
+    stickAngle = 0;
+    stickLength = 0;
+  }
+  throttle = crsf->rcToUs(crsf->getChannel(3));
+  throttle = (throttle - 1000) / 1000.0;  // normalize to [0-1]
+  rudderInput = crsf->rcToUs(crsf->getChannel(4));
+  inputToggleL = crsf->rcToUs(crsf->getChannel(6));
+  inputToggleR = crsf->rcToUs(crsf->getChannel(7));
+  inputPot = crsf->rcToUs(crsf->getChannel(8));
 
-  radiusInput = inputToggleL;
-  ledOffset = inputToggleR;
-
-  if (radiusInput < 0.33) {
-    radiusSize = 0.025;
-  } else if (radiusInput >= 0.33 && radiusInput < 0.66) {
-    radiusSize = 0.030;
-  } else {
-    radiusSize = 0.035;
+  if (inputToggleR >= 1500) {
+    ledOffset = (inputPot - 1500) / 1000.0;
+  }
+  if (inputToggleR < 1500) {
+    radiusInput = inputPot;
   }
 
-  radiusSize += rudderInput * 0.003;
-  ledOffset = ledOffset - 0.5;
+  rudderInput = map(rudderInput, 1000, 2000, -300, 300);                // rudder can change by =/- 3mm
+  radiusSize = map(radiusInput + rudderInput, 1000, 2000, 2500, 3500);  // 25mm to 35mm range
+  radiusSize = radiusSize / 100000.0;
 
-  if (aux6 < 0.33) {
-    aux6 = 0.5;
-  } else if (aux6 >= 0.33 && aux6 < 0.66) {
-    aux6 = 0.75;
-  } else {
-    aux6 = 1.0;
-  }
+  kalmanQ = inputToggleL;  // should be 1000, 1500 or 2000
+
+  kalmanQ = constrain(kalmanQ, 1000, 2000);
+  kalmanQ = map(kalmanQ, 1000, 2000, 0, 3);
+  kalmanQ = 0.5 + (1.0 / pow(10, kalmanQ));
+  kalmanFilter.setProcessNoise(kalmanQ);
+
+  aux6 = crsf->rcToUs(crsf->getChannel(10));
+  aux6 = constrain(aux6, 1000, 2000);
+  aux6 = (aux6 - 950) / 500.0;  // should be 0.1-2.1 float value.
+  aux7 = crsf->rcToUs(crsf->getChannel(11));
+  aux7 = (aux7 - 1000) / 1000.0;  // 0-1.0 float value
 }
 
-float calculateW() {
-  float accelX = accel_event.acceleration.x - accelOffsetX;
-  float accelY = accel_event.acceleration.y - accelOffsetY;
-  float accelZ = accel_event.acceleration.z - accelOffsetZ;
+void setPattern(uint16_t r, uint16_t g, uint16_t b) {
+  redState = g;
+  greenState = r;
+  blueState = b;
+}
 
-  if (isnan(accelX)) accelX = 0;
-  if (isnan(accelY)) accelY = 0;
-  if (isnan(accelZ)) accelZ = 0;
+float normalize(float phase, float minVal = -0.5, float maxVal = 0.5) {
+  // Normalize to 0-1 range first
+  phase = fmod(phase, 1.0);
+  if (phase < 0) phase += 1.0;
 
-  float spinAccel = sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ);
-
-  kalmanInput = aux7;
-  if (kalmanInput < 0.33) {
-    kalmanQ = 0.01;
-  } else if (kalmanInput >= 0.33 && kalmanInput < 0.66) {
-    kalmanQ = 0.1;
-  } else {
-    kalmanQ = 1.0;
+  // Then shift to desired range
+  if (minVal != 0 || maxVal != 1.0) {
+    if (phase > maxVal && phase <= 1.0) phase -= 1.0;
+    if (phase < minVal) phase += 1.0;
   }
 
-  kalmanFilter.setProcessNoise(kalmanQ);
-  estimated_accel = kalmanFilter.updateEstimate(spinAccel);
+  return phase;
+}
 
-  spinAccel = estimated_accel;
+float calculateW() {  // probably takes more than 310us to get sensor data
+  // Get accelerometer data
+  sensors_event_t s;
+  lis.getEvent(&s);
 
-  if (spinAccel <= 0 || isnan(spinAccel) || isinf(spinAccel)) {
+  // 1. Validate raw Z-axis acceleration
+  if (isnan(s.acceleration.z) || isinf(s.acceleration.z)) {
+    if (DEBUG_HOTLOOP) Serial.printf(" Bad Z-accel: %.2f (X=%.2f, Y=%.2f)\n", s.acceleration.z, s.acceleration.x, s.acceleration.y);
+    return RPS_THRESHOLD * 2 * PI;  // Return safe value in radians/sec
+  }
+
+  // 2. Apply calibration offsets
+  float z = s.acceleration.z - accelOffsetZ;
+
+  // 3a. Update Kalman filter with calibrated value
+  //float spinAccel = kalmanFilter.updateEstimate(z);
+  // 3b. plain sensor reading instead of kalman
+  float spinAccel = z;
+  estimated_accel = spinAccel;  // Store for telemetry
+
+
+  // 4. Check accelerometer data after filtering
+  if ((spinAccel <= 0) || isnan(spinAccel) || isinf(spinAccel)) {
     if (DEBUG_HOTLOOP) Serial.printf(" Invalid accel data: %1.2f\n", spinAccel);
-    return RPS_THRESHOLD * 2 * PI;
+    return RPS_THRESHOLD * 2 * PI;  // Fallback to safe value in radians/sec
   }
 
+  // 5. Check radius size
   if (radiusSize <= 0 || isnan(radiusSize) || isinf(radiusSize)) {
     if (DEBUG_HOTLOOP) Serial.printf(" Invalid radius: %.4f\n", radiusSize);
-    return RPS_THRESHOLD * 2 * PI;
+    return RPS_THRESHOLD * 2 * PI;  // Fallback to safe value in radians/sec
   }
 
+  // 6. Calculate w (angular velocity in radians/sec)
   float w = sqrt(spinAccel / radiusSize);
 
+  // 7. Calculate RPS for compatibility with existing code
   float rps = w / (2 * PI);
 
+  // 8. Update maxRPS if valid
   if (rps > maxRPS) {
     maxRPS = rps;
   }
 
-  lastRPS = rps;
+  lastRPS = rps;  // Store for telemetry and other uses
 
+  // 9. Ensure w does not fall below threshold
   if (w < RPS_THRESHOLD * 2 * PI) {
     w = RPS_THRESHOLD * 2 * PI;
   }
@@ -367,50 +407,57 @@ float calculateW() {
   return w;
 }
 
-void updatePhaseTracking(float w) {
+void updatePhaseTracking(float w) {  // whenever called it updates currentPhase by adding w*dT and keeping track of last update time.
+  // Get current time
   unsigned long now = micros();
 
+  // Calculate time since last update
   unsigned long deltaTime = now - lastPhaseUpdate;
 
-  if (lastPhaseUpdate == 0 || deltaTime > 100000) {
+  // Skip if this is the first call or after a long delay
+  if (lastPhaseUpdate == 0 || deltaTime > 100000) {  // 100ms
     lastPhaseUpdate = now;
     previousW = w;
     return;
   }
 
+  // Trapezoidal integration: use average of current and previous angular velocity
   float deltaAngle = (w + previousW) * 0.5f * deltaTime * 0.000001f;
 
+  // Update continuous phase
   continuousPhase += deltaAngle / (2 * PI);
 
+  // Keep phase in 0.0-1.0 range
   continuousPhase = normalize(continuousPhase, 0, 1.0);
 
+  // Store for next iteration
   previousW = w;
   lastPhaseUpdate = now;
 }
 
 void checkLoggingTrigger() {
-  if (aux7 > 0.5 && !loggingActive && !dataReady && logIndex < LOG_BUFFER_SIZE) {
+  if (aux7 > 0.6 && !loggingActive && !dataReady && logIndex < LOG_BUFFER_SIZE) {
     loggingActive = true;
     logIndex = 0;
-    //Serial.println("Logging started");
+    if(DEBUG_HLTELEM) {Serial.println("HL Logging started");}
   }
 }
 
-void logSample(int32_t hotLoopCount, float cos_ph1) {
+void logSample(float hotLoopCount, float cos_ph1, unsigned long time) {
   if (loggingActive && logIndex < LOG_BUFFER_SIZE) {
-    logBuffer[logIndex].timestamp_us = micros();
+    logBuffer[logIndex].timestamp_us = (float)time;
     logBuffer[logIndex].phase = continuousPhase;
     logBuffer[logIndex].m1_throttle = motor1Throttle;
     logBuffer[logIndex].m2_throttle = motor2Throttle;
     logBuffer[logIndex].cos_phase1 = cos_ph1;
     logBuffer[logIndex].hotloop_count = hotLoopCount;
-    
+
     logIndex++;
-    
+
     if (logIndex >= LOG_BUFFER_SIZE) {
       loggingActive = false;
       dataReady = true;
-      //Serial.println("Buffer full - logging stopped");
+      if(DEBUG_HLTELEM){Serial.println("HL Buffer full - logging stopped");}
     }
   }
 }
@@ -419,7 +466,7 @@ void checkDumpTrigger() {
   if (throttle < ZERO_THROTTLE_THRESHOLD && dataReady && !dumpMode) {
     dumpMode = true;
     dumpIndex = 0;
-    //Serial.println("Entering dump mode");
+    if(DEBUG_HLTELEM){Serial.println("Entering HL dump mode");}
   }
 }
 
@@ -432,81 +479,92 @@ void dumpLoggedData() {
     telemVal[4] = logBuffer[dumpIndex].m2_throttle;
     telemVal[5] = logBuffer[dumpIndex].cos_phase1;
     telemVal[6] = (float)logBuffer[dumpIndex].hotloop_count;
-    telemVal[7] = 1717.1717;
-    
+    telemVal[7] = 17.1717; // magic number for searching on
+
     dumpIndex++;
-    
+
     if (dumpIndex >= logIndex) {
       dumpMode = false;
       dataReady = false;
       logIndex = 0;
-      //Serial.println("Dump complete");
+      if(DEBUG_HLTELEM){Serial.println("HL Dump complete");}
     }
   }
 }
 
 void MeltybrainDrive1() {
+  // Calculate initial angular velocity (w)
   float W = calculateW();
   updatePhaseTracking(W);
 
+  // Calculate expected revolution time based on angular velocity
   unsigned long exitDurationMicros = (unsigned long)((2.0 * PI / W) * 1000000);
 
-  ledInterruptsEnabled = false;
+  ledInterruptsEnabled = false;  // Bypass LED interrupt action
 
+  // Track hot loop iterations for diagnostic purposes
   int32_t hotLoopCount = 0;
+  // track loop entry time
   unsigned long usLoopStartTime = micros();
 
+  // HOT LOOP
   while (true) {
+    // Get current time
     unsigned long currentTimeMicros = micros();
 
-    if (DEBUG_HOTHZ) {
+    if (DEBUG_HOTHZ) {  // timing this loop
       hotHz = 1000000.0 / (currentTimeMicros - hotMicros);
       hotMicros = currentTimeMicros;
     }
 
+    // Exit conditions
     if (throttle < ZERO_THROTTLE_THRESHOLD || (currentTimeMicros - usLoopStartTime) > 2000000) {
       if (DEBUG_HOTLOOP) Serial.println(" Throttle zero or Timeout");
       break;
     }
 
-    if ((currentTimeMicros - usLoopStartTime) > exitDurationMicros) {
+    if ((currentTimeMicros - usLoopStartTime) > exitDurationMicros) {  // one revolution time elapsed
       break;
     }
 
+    // Update angular velocity and phase tracking
     W = calculateW();
     updatePhaseTracking(W);
 
-    hotLoopCount++;
+    hotLoopCount++;  // Count iterations of the hot loop
 
     float forwardPhase = normalize(continuousPhase + stickAngle, -0.5, 0.5);
     float backwardPhase = normalize(continuousPhase + stickAngle + 0.5, -0.5, 0.5);
-    float ledPhase = normalize(continuousPhase + ledOffset, -0.5, 0.5);
+    //float ledPhase = normalize(continuousPhase + stickAngle + ledOffset, -0.5, 0.5);
+    float ledPhase = normalize(continuousPhase + ledOffset, -0.5, 0.5);  // try fixed leds
 
     float cos_ph1 = cos(forwardPhase * 2 * PI);
     float cos_ph2 = cos(backwardPhase * 2 * PI);
     float cos_led = cos(ledPhase * 2 * PI);
 
     float widthScale = max(stickLength, throttle);
-    float th1 = max(0, (cos_ph1 * aux6 * stickLength) + throttle);
+    // float th1 = max(0, (cos_ph1 * TRANSL_STRENGTH * stickLength) + throttle);
+    //float th2 = max(0, (cos_ph2 * TRANSL_STRENGTH * stickLength) + throttle);
+    float th1 = max(0, (cos_ph1 * aux6 * stickLength) + throttle);  // try with adjustable strength pulse
     float th2 = max(0, (cos_ph2 * aux6 * stickLength) + throttle);
 
     if (DEBUG_HOTLOOP) {
       Serial.print(" th1:");
       Serial.println(th1);
     }
-    setThrottle(th1, -th2);
+    setThrottle(th1, -th2);            // -th2 because of CW spin direction
+    logSample(hotLoopCount, cos_ph1, currentTimeMicros - usLoopStartTime);  // ADD THIS LINE
 
-    logSample(hotLoopCount, cos_ph1);
 
-    bool LEDOn = cos_led > 0.7071 * (1.4 - widthScale * 0.9);
+    bool LEDOn = cos_led > 0.7071 * (1.4 - widthScale * 0.9);  // Magic numbers for ~45deg arc
     uint32_t COLOR = LEDOn * BLUE + LEDOn * GREEN;
     float currentRPS = W / (2 * PI);
-    if (currentRPS <= RPS_THRESHOLD) { COLOR = LEDOn * BLUE; }
+    if (currentRPS <= RPS_THRESHOLD) { COLOR = LEDOn * BLUE; }  // just BLUE if below threshold
     for (int l = 0; l <= NUMPIXELS; l++) { leds.setPixelColor(l, COLOR); }
     leds.show();
   }
 
-  ledInterruptsEnabled = true;
+  ledInterruptsEnabled = true;  // Resume LED interrupt action
 }
 
 void loop() {
@@ -515,40 +573,41 @@ void loop() {
   static int i, j = 0;
   static uint32_t lastTime = 0;
   j++;
-  if (j % 250 == 0) { pulse = !pulse; }
+  if (j % 250 == 0) { pulse = !pulse; }  //led blink every 250 reads (1/4 sec?)
 
   crsf->update();
   updateInputs();
-  
-  checkLoggingTrigger();
-  checkDumpTrigger();
+
+  checkLoggingTrigger();  // ADD THIS LINE
+  checkDumpTrigger();     // ADD THIS LINE
 
   if (FAILSAFE == true) {
-    pixel.setPixelColor(0, 255, 0, 0);
+    pixel.setPixelColor(0, 255, 0, 0);  // red
     setPattern(LED_PATTERN_RADIO_ERROR);
     setThrottle(0, 0);
   } else {
-    pixel.setPixelColor(0, 0, 255, 0);
+    pixel.setPixelColor(0, 0, 255, 0);  //green
     setPattern(LED_PATTERN_LOWRPS);
   }
 
   meltyMode = (throttle > ZERO_THROTTLE_THRESHOLD);
   tankMode = (throttle < ZERO_THROTTLE_THRESHOLD);
 
-  if (tankMode && !FAILSAFE) {
+  if (tankMode && !FAILSAFE) {  // Tank mode
     setPattern(LED_PATTERN_CYCLE);
     TankDrive();
-  } else if (meltyMode && !FAILSAFE) {
+  } else if (meltyMode && !FAILSAFE) {  // Melty mode
     setPattern(LED_PATTERN_OFF);
     MeltybrainDrive1();
-  } else {
+  } else {  //error shouldn't be here
   }
 
   delayMicroseconds(200);
 
-  if (millis() - lastTime > 100) {
+  //rpm++;                            // eRPM = RPM * poles/2
+  if (millis() - lastTime > 100) {  // run 10hz stuff, mainly display
     lastTime = millis();
-    if (DEBUG_TIMERS) {
+    if (DEBUG_TIMERS) {  // serial stuff
       Serial.print(" sensHz: ");
       Serial.print(sensHz);
       Serial.print("\tledHz: ");
@@ -572,19 +631,28 @@ void loop() {
       Serial.printf(" Rmm: %.1f ", radiusSize * 1000);
       Serial.print(" Led: ");
       Serial.print(ledOffset);
-
       Serial.print(" Z: ");
       Serial.println(accel_event.acceleration.z - accelOffsetZ);
     }
     i = !i;
-    
-    if (DEBUG_TELEMETRY) {
-      const char **currentLabels;
-      
+
+    if (TELEMETRY) {
       if (dumpMode) {
+        // Populate telemVal with logged data
         dumpLoggedData();
-        currentLabels = telemLblDump;
+
+        // Send telemetry
+        for (int k = 0; k < 8; k++) {
+          Serial2.printf("%s,%f", telemDumpLbl[k], telemVal[k]);
+          if (k < 7) {
+            Serial2.print(",");
+          } else {
+            Serial2.print("\n");
+          }
+        }
+
       } else {
+        // Normal mode telemetry
         telemVal[0] = radiusSize * 1000.0;
         telemVal[1] = ledOffset;
         telemVal[2] = hotHz;
@@ -593,20 +661,20 @@ void loop() {
         telemVal[5] = FAILSAFE;
         telemVal[6] = lastRPS * 60.0;
         telemVal[7] = (accel_event.acceleration.x - accelOffsetX);
-        currentLabels = telemLbl;
-      }
-      
-      for (int k = 0; k < 8; k++) {
-        Serial2.printf("%s,%f", currentLabels[k], telemVal[k]);
-        if (k < 7) {
-          Serial2.print(",");
-        } else {
-          Serial2.print("\n");
+
+        // Send telemetry
+        for (int k = 0; k < 8; k++) {
+          Serial2.printf("%s,%f", telemLbl[k], telemVal[k]);
+          if (k < 7) {
+            Serial2.print(",");
+          } else {
+            Serial2.print("\n");
+          }
         }
       }
     }
 
-    pixel.show();
-    digitalWrite(PIN_LED, pulse);
+    pixel.show();                  // display pixel
+    digitalWrite(PIN_LED, pulse);  //send led pin
   }
 }

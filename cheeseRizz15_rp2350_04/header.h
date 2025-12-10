@@ -1,12 +1,13 @@
 //DEBUGGING
-#define CRSF_DEBUG 0       // show all crf channels on serial
-#define DEBUG_HOTLOOP 0    // debugs in calculateW, other melty loop unctions
-#define DEBUG_HOTHZ 1      // debugs counts hz of loop
-#define DEBUG_SERIAL 1     // Serial debug output toggle
-#define DEBUG2_SERIAL 0    // Serial debug output toggle
-#define DEBUG_TIMERS 0     // Serial debug output toggle
-#define DEBUG_ACCEL 1      // Serial debug output toggle
-#define DEBUG_TELEMETRY 1  // send serial2 data for espnow module
+#define CRSF_DEBUG 0     // show all crf channels on serial
+#define TELEMETRY 1      // send serial2 data for espnow module
+#define DEBUG_HOTLOOP 0  // debugs in calculateW, other melty loop unctions
+#define DEBUG_HOTHZ 1    // debugs counts hz of loop
+#define DEBUG_SERIAL 1   // Serial debug output toggle
+#define DEBUG_TIMERS 0   // Serial debug output most hZ toggle
+#define DEBUG_ACCEL 1    // Serial debug output sensHz toggle
+#define DEBUG_HLTELEM 0  // Serial debug of hot loop telemetry statuses toggle
+
 
 //#define PIN_LED 25 // D19 xiao, LOW = on this is in the board definition
 #define NEOPIXEL_BUILTIN 22
@@ -147,29 +148,49 @@ volatile uint8_t rbit;
 volatile uint8_t gbit;
 volatile uint8_t bbit;
 
-//Telemetry Labels - Normal Mode
+//Telemetry Labels
 const char *telemLbl[] = {
-  "radiusmm",    // f1: , version number
-  "LEDoffs",     // fl2:
-  "hotHZ",       //fl3:
-  "m1Th",        // fl4:
-  "aux6",        // fl5:
-  "FailSafe",    // fl6:
-  "rpm",         // fl7:
-  "accelX"       // fl8:
+  "radiusmm",  // f1: , version number
+  "LEDoffs",   // fl2:
+  "hotHZ",     //fl3:
+  "m1Th",      // fl4:
+  "aux6",      // fl5:
+  "FailSafe",  // fl6:
+  "rpm",       // fl7:
+  "accelX"     // fl8:
 };
 
-//Telemetry Labels - Dump Mode
-const char *telemLblDump[] = {
-  "buffIdx",     // f1: buffer index
-  "micros",      // f2: timestamp
-  "phase",       // f3: continuousPhase
-  "m1th",        // f4: motor1Throttle
-  "m2th",        // f5: motor2Throttle
-  "cosph1",      // f6: cos_ph1
-  "hlcount",     // f7: hotLoopCount
-  "unused"       // f8: unused
+const char *telemDumpLbl[] = {
+  "index",    // f1: , version number
+  "us",       // fl2:
+  "phase",    //fl3:
+  "m1Th",     // fl4:
+  "m2Th",     // fl5:
+  "cosph1",   // fl6:
+  "LoopCnt",  // fl7:
+  "svntn"     // fl8:
 };
+
+// ============ DATA LOGGING STRUCTURES ============
+#define LOG_BUFFER_SIZE 750
+
+// Structure to hold one sample of logged data
+struct LogSample {
+  float timestamp_us;
+  float phase;
+  float m1_throttle;
+  float m2_throttle;
+  float cos_phase1;
+  float hotloop_count;
+};
+
+// Logging state variables
+LogSample logBuffer[LOG_BUFFER_SIZE];
+volatile uint16_t logIndex = 0;
+volatile bool loggingActive = false;
+volatile bool dataReady = false;
+volatile bool dumpMode = false;
+volatile uint16_t dumpIndex = 0;
 
 //telemetry Values
 volatile float telemVal[] = {
@@ -182,24 +203,3 @@ volatile float telemVal[] = {
   0.0,
   0.0,
 };
-
-// ============ DATA LOGGING STRUCTURES ============
-#define LOG_BUFFER_SIZE 750
-
-// Structure to hold one sample of logged data
-struct LogSample {
-  uint32_t timestamp_us;
-  float phase;
-  float m1_throttle;
-  float m2_throttle;
-  float cos_phase1;
-  int32_t hotloop_count;
-};
-
-// Logging state variables
-LogSample logBuffer[LOG_BUFFER_SIZE];
-volatile uint16_t logIndex = 0;
-volatile bool loggingActive = false;
-volatile bool dataReady = false;
-volatile bool dumpMode = false;
-volatile uint16_t dumpIndex = 0;

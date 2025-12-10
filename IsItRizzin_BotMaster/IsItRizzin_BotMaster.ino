@@ -85,7 +85,7 @@ void setup() {
   logger.setIntervals(100, 3000);
 
   // Set default title for the display
-  logger.setTitle("CheeseRizz 10/0.33");
+  logger.setTitle("CheeseRizz 10/0.25");
 
   // Set default labels (will be overwritten when received from Serial1)
   logger.setLabel(0, "Value1");
@@ -183,5 +183,6 @@ void parseSerialData(char* data) {
   }
 
   // Send header if labels have changed
-  logger.sendHeader();
+  // this probably shouldn't be inparse data... CHECK
+  //logger.sendHeader();
 }
