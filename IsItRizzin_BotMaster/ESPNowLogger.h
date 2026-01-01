@@ -10,7 +10,7 @@
 
 // Configuration constants
 #define MAX_DATA_VALUES 8
-#define MAX_LABEL_LENGTH 8
+#define MAX_LABEL_LENGTH 10
 #define MAX_TITLE_LENGTH 32
 #define DEFAULT_DATA_INTERVAL_MS 250
 #define DEFAULT_HEADER_INTERVAL_MS 10000
@@ -25,7 +25,8 @@ enum MessageType {
 struct LogEntry {
   uint8_t msgType;               // Use first byte for message type (0 = data)
   uint32_t timestamp;            // Milliseconds since boot
-  float values[MAX_DATA_VALUES]; // Telemetry data values
+  uint32_t value0;               // First value as uint32_t (for micros() etc)
+  float values[7];               // Remaining 7 telemetry data values
 };
 
 struct HeaderEntry {
@@ -54,7 +55,8 @@ public:
                    uint32_t headerIntervalMs = DEFAULT_HEADER_INTERVAL_MS);
   
   // For master: Set the telemetry values
-  void setValue(uint8_t index, float value);
+  void setValue(uint8_t index, uint32_t value);  // For index 0 (uint32_t)
+  void setValue(uint8_t index, float value);     // For indices 1-7 (float)
   
   // For master: Set a label for a value
   void setLabel(uint8_t index, const char* label);
@@ -68,8 +70,9 @@ public:
   // For master: Force sending a header packet
   void sendHeader();
   
-  // For slave: Get the last received value
-  float getValue(uint8_t index);
+  // For slave: Get the last received values
+  uint32_t getValueUint32(uint8_t index);  // For index 0 (uint32_t)
+  float getValue(uint8_t index);           // For indices 1-7 (float)
   
   // For slave: Get the label for a value
   const char* getLabel(uint8_t index);
@@ -91,6 +94,15 @@ public:
   
   // For slave: Check if header has ever been received
   bool headerReceived();
+  
+  // For slave: Pause reception (unregister callback)
+  void pauseReception();
+  
+  // For slave: Resume reception (re-register callback)
+  void resumeReception();
+  
+  // For slave: Check if reception is paused
+  bool isReceptionPaused();
 
 private:
   Mode _mode;
@@ -112,6 +124,7 @@ private:
   bool _newDataReceived;
   bool _newHeaderReceived;
   uint32_t _lastReceivedTimestamp;
+  bool _receptionPaused;
   
   // ESP-NOW callbacks
   static void onDataSent(const uint8_t* mac, esp_now_send_status_t status);

@@ -1,6 +1,4 @@
 // ESP-NOW Logger Implementation - With Title Support
-//
-
 
 #include "ESPNowLogger.h"
 
@@ -20,6 +18,7 @@ ESPNowLogger::ESPNowLogger(Mode mode) {
   _headerIntervalMs = DEFAULT_HEADER_INTERVAL_MS;
   _lastDataSent = 0;
   _lastHeaderSent = 0;
+  _receptionPaused = false;
   
   // Initialize data structures
   memset(&_dataPacket, 0, sizeof(LogEntry));
@@ -31,7 +30,7 @@ ESPNowLogger::ESPNowLogger(Mode mode) {
   
   // Set default title
   strncpy(_headerPacket.title, "Telemetry Data", MAX_TITLE_LENGTH - 1);
-  _headerPacket.title[MAX_TITLE_LENGTH - 1] = '\0'; // Ensure null termination
+  _headerPacket.title[MAX_TITLE_LENGTH - 1] = '\0';
   
   // Set default labels
   for (int i = 0; i < MAX_DATA_VALUES; i++) {
@@ -87,25 +86,34 @@ void ESPNowLogger::setIntervals(uint32_t dataIntervalMs, uint32_t headerInterval
   _headerIntervalMs = headerIntervalMs;
 }
 
-// Set a telemetry value
-void ESPNowLogger::setValue(uint8_t index, float value) {
-  if (index < MAX_DATA_VALUES) {
-    _dataPacket.values[index] = value;
+// Set a telemetry value (uint32_t version for index 0)
+void ESPNowLogger::setValue(uint8_t index, uint32_t value) {
+  if (index == 0) {
+    _dataPacket.value0 = value;
   }
+  // Ignore if index != 0
+}
+
+// Set a telemetry value (float version for indices 1-7)
+void ESPNowLogger::setValue(uint8_t index, float value) {
+  if (index > 0 && index < MAX_DATA_VALUES) {
+    _dataPacket.values[index - 1] = value;
+  }
+  // Ignore if index == 0 (must use uint32_t version)
 }
 
 // Set a label for a telemetry value
 void ESPNowLogger::setLabel(uint8_t index, const char* label) {
   if (index < MAX_DATA_VALUES) {
     strncpy(_headerPacket.labels[index], label, MAX_LABEL_LENGTH);
-    _headerPacket.labels[index][MAX_LABEL_LENGTH] = '\0'; // Ensure null termination
+    _headerPacket.labels[index][MAX_LABEL_LENGTH] = '\0';
   }
 }
 
 // Set the title for the display
 void ESPNowLogger::setTitle(const char* title) {
   strncpy(_headerPacket.title, title, MAX_TITLE_LENGTH - 1);
-  _headerPacket.title[MAX_TITLE_LENGTH - 1] = '\0'; // Ensure null termination
+  _headerPacket.title[MAX_TITLE_LENGTH - 1] = '\0';
 }
 
 // Update function - call in main loop
@@ -151,10 +159,18 @@ void ESPNowLogger::sendHeader() {
   }
 }
 
-// Get a telemetry value (for slave)
+// Get a telemetry value (uint32_t version for index 0)
+uint32_t ESPNowLogger::getValueUint32(uint8_t index) {
+  if (index == 0) {
+    return _dataPacket.value0;
+  }
+  return 0;
+}
+
+// Get a telemetry value (float version for indices 1-7)
 float ESPNowLogger::getValue(uint8_t index) {
-  if (index < MAX_DATA_VALUES) {
-    return _dataPacket.values[index];
+  if (index > 0 && index < MAX_DATA_VALUES) {
+    return _dataPacket.values[index - 1];
   }
   return 0.0f;
 }
@@ -199,6 +215,40 @@ bool ESPNowLogger::isConnected() {
 // Check if we've ever received a header
 bool ESPNowLogger::headerReceived() {
   return _headerReceived;
+}
+
+// Pause reception (for slave)
+void ESPNowLogger::pauseReception() {
+  if (_mode != SLAVE) {
+    return;
+  }
+  
+  if (_receptionPaused) {
+    return;
+  }
+  
+  esp_now_unregister_recv_cb();
+  _receptionPaused = true;
+  _connected = false;
+}
+
+// Resume reception (for slave)
+void ESPNowLogger::resumeReception() {
+  if (_mode != SLAVE) {
+    return;
+  }
+  
+  if (!_receptionPaused) {
+    return;
+  }
+  
+  esp_now_register_recv_cb(onDataReceived);
+  _receptionPaused = false;
+}
+
+// Check if reception is paused
+bool ESPNowLogger::isReceptionPaused() {
+  return _receptionPaused;
 }
 
 // ESP-NOW callback when data is sent

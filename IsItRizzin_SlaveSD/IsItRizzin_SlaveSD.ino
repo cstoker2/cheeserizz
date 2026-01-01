@@ -1,8 +1,9 @@
 // Slave Example - ESP32-2432S028R (CYD) Display
 //program as esp32 Dev Module
 // This will receive and display telemetry data via ESPnow from the robot
-// logging to SD card, master is usually set to send values 4hz, labels 1/3hz
+// logging to SD card, master is usually set to send values 10hz, labels 1/3hz
 // buffer of 10000 writes approx every 45sec.
+// 12-10-25 changed to 10 char labels and index 0 as uint32_t
 
 #include <Arduino.h>
 #include <TFT_eSPI.h>
@@ -180,11 +181,19 @@ void updateValues() {
 
   // Update each telemetry value
   for (int i = 0; i < MAX_DATA_VALUES; i++) {
-    float value = logger.getValue(i);
     int y = FIRST_ROW_Y + (i * ROW_HEIGHT);
-    // Display new value with 1 decimal place
-    char valueStr[10];
-    dtostrf(value, 4, 2, valueStr);
+    char valueStr[16];
+    
+    if (i == 0) {
+      // Index 0: uint32_t - display as plain integer with no separators
+      uint32_t value0 = logger.getValueUint32(0);
+      sprintf(valueStr, "%lu", value0);
+    } else {
+      // Indices 1-7: float - display with 2 decimal places
+      float value = logger.getValue(i);
+      dtostrf(value, 4, 2, valueStr);
+    }
+    
     tft.drawString(valueStr, VALUE_X, y, 2);
   }
 
@@ -320,7 +329,18 @@ void loop() {
     lastUpdateTime = millis();
     updateValues();
     needsRefresh = true;
-    sprintf(dataString, "%4.3f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f\n", logger.getLastTimestamp() / 1000.0, logger.getValue(0), logger.getValue(1), logger.getValue(2), logger.getValue(3), logger.getValue(4), logger.getValue(5), logger.getValue(6), logger.getValue(7));
+    
+    // Format CSV data string with uint32_t for index 0, floats for rest
+    sprintf(dataString, "%4.3f,%lu,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f\n", 
+            logger.getLastTimestamp() / 1000.0, 
+            logger.getValueUint32(0),
+            logger.getValue(1), 
+            logger.getValue(2), 
+            logger.getValue(3), 
+            logger.getValue(4), 
+            logger.getValue(5), 
+            logger.getValue(6), 
+            logger.getValue(7));
     newLogLine = true;
 
     if (!initialDataReceived) {

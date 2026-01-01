@@ -2,8 +2,8 @@
 // This will receive data from another microcontroller and send it to the CYD display so you can check...
 // Is It Rizzin ? (especially if your bot is named CheeseRizz)
 // Cameron Stoker, Complified Creations, March 2025
-
-//Data stream has 8 values (floats) and names (string) for those 8 floats on each line.
+//12-10-25 - modified to allow 10 char labels, and index 0 of values is now uint32_t
+//Data stream has 8 values (1 uint32_t + 7 floats) and names (string) for those 8 values on each line.
 
 /*Serial1 data should be this format:
 Label1,Value1,Label2,Value2,Label3,Value3,Label4,Value4,Label5,Value5,Label6,Value6,Label7,Value7,Label8,Value8\n
@@ -15,7 +15,7 @@ Serial1.begin(115200);
 }
 
 void loop() {
-float Value1 = 1.0;
+uint32_t Value1 = micros();  // Index 0 is always uint32_t
 float Value2 = 2.0;
 float Value3 = 3.0;
 float Value4 = 4.0;
@@ -24,7 +24,7 @@ float Value6 = 6.0;
 float Value7 = 7.0;
 float Value8 = 8.0;
 
-Serial1.printf("Label1,%f,Label2,%f,Label3,%f,Label4,%f,Label5,%f,Label6,%f,Label7,%f,Label8,%f\n",Value1,Value2,Value3,Value4,Value5,Value6,Value7,Value8);
+Serial1.printf("Label1,%lu,Label2,%f,Label3,%f,Label4,%f,Label5,%f,Label6,%f,Label7,%f,Label8,%f\n",Value1,Value2,Value3,Value4,Value5,Value6,Value7,Value8);
 delay(500); 
   }
 */
@@ -81,7 +81,7 @@ void setup() {
   }
 
   // Set custom data transmission intervals
-  // Data every 250ms, header every 3 seconds
+  // Data every 100ms, header every 3 seconds
   logger.setIntervals(100, 3000);
 
   // Set default title for the display
@@ -170,9 +170,16 @@ void parseSerialData(char* data) {
       char* trimmedValue = token;
       while (*trimmedValue == ' ') trimmedValue++;  // Skip leading spaces
 
-      // Convert to float and set the value
-      float value = atof(trimmedValue);
-      logger.setValue(index, value);
+      // Parse value based on index (Option B: index 0 = uint32_t, rest = float)
+      if (index == 0) {
+        // Index 0: Always parse as uint32_t
+        uint32_t value = (uint32_t)atol(trimmedValue);
+        logger.setValue(0, value);
+      } else {
+        // Indices 1-7: Always parse as float
+        float value = atof(trimmedValue);
+        logger.setValue(index, value);
+      }
 
       // Move to next index
       index++;
@@ -181,8 +188,4 @@ void parseSerialData(char* data) {
     // Get next label
     token = strtok(NULL, ",");
   }
-
-  // Send header if labels have changed
-  // this probably shouldn't be inparse data... CHECK
-  //logger.sendHeader();
 }

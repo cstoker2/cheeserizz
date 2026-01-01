@@ -308,10 +308,10 @@ void updateInputs() {
   inputToggleR = crsf->rcToUs(crsf->getChannel(7));
   inputPot = crsf->rcToUs(crsf->getChannel(8));
 
-  if (inputToggleR >= 1500) {
+  if (inputToggleR > 1600) {  // switch up = leds
     ledOffset = (inputPot - 1500) / 1000.0;
   }
-  if (inputToggleR < 1500) {
+  if (inputToggleR < 1400) {  // switch down = radius
     radiusInput = inputPot;
   }
 
@@ -392,7 +392,7 @@ float calculateW() {  // probably takes more than 310us to get sensor data
   // 7. Calculate RPS for compatibility with existing code
   float rps = w / (2 * PI);
 
-  // 8. Update maxRPS if valid
+  // 8. keep track of maximum rps
   if (rps > maxRPS) {
     maxRPS = rps;
   }
@@ -439,25 +439,27 @@ void checkLoggingTrigger() {
   if (aux7 > 0.6 && !loggingActive && !dataReady && logIndex < LOG_BUFFER_SIZE) {
     loggingActive = true;
     logIndex = 0;
-    if(DEBUG_HLTELEM) {Serial.println("HL Logging started");}
+    if (DEBUG_HLTELEM) { Serial.println("HL Logging started"); }
   }
 }
 
-void logSample(float hotLoopCount, float cos_ph1, unsigned long time) {
+void logSample(uint32_t usec0, float sample1, float sample2, float sample3, float sample4, float sample5, float sample6, float sample7) {
   if (loggingActive && logIndex < LOG_BUFFER_SIZE) {
-    logBuffer[logIndex].timestamp_us = (float)time;
-    logBuffer[logIndex].phase = continuousPhase;
-    logBuffer[logIndex].m1_throttle = motor1Throttle;
-    logBuffer[logIndex].m2_throttle = motor2Throttle;
-    logBuffer[logIndex].cos_phase1 = cos_ph1;
-    logBuffer[logIndex].hotloop_count = hotLoopCount;
+    logBuffer[logIndex].usec0 = usec0;
+    logBuffer[logIndex].sample1 = sample1;
+    logBuffer[logIndex].sample2 = sample2;
+    logBuffer[logIndex].sample3 = sample3;
+    logBuffer[logIndex].sample4 = sample4;
+    logBuffer[logIndex].sample5 = sample5;
+    logBuffer[logIndex].sample6 = sample6;
+    logBuffer[logIndex].sample7 = sample7;
 
     logIndex++;
 
     if (logIndex >= LOG_BUFFER_SIZE) {
       loggingActive = false;
       dataReady = true;
-      if(DEBUG_HLTELEM){Serial.println("HL Buffer full - logging stopped");}
+      if (DEBUG_HLTELEM) { Serial.println("HL Buffer full - logging stopped"); }
     }
   }
 }
@@ -466,20 +468,20 @@ void checkDumpTrigger() {
   if (throttle < ZERO_THROTTLE_THRESHOLD && dataReady && !dumpMode) {
     dumpMode = true;
     dumpIndex = 0;
-    if(DEBUG_HLTELEM){Serial.println("Entering HL dump mode");}
+    if (DEBUG_HLTELEM) { Serial.println("Entering HL dump mode"); }
   }
 }
 
 void dumpLoggedData() {
   if (dumpMode && dumpIndex < logIndex) {
-    telemVal[0] = (float)dumpIndex;
-    telemVal[1] = (float)logBuffer[dumpIndex].timestamp_us;
-    telemVal[2] = logBuffer[dumpIndex].phase;
-    telemVal[3] = logBuffer[dumpIndex].m1_throttle;
-    telemVal[4] = logBuffer[dumpIndex].m2_throttle;
-    telemVal[5] = logBuffer[dumpIndex].cos_phase1;
-    telemVal[6] = (float)logBuffer[dumpIndex].hotloop_count;
-    telemVal[7] = 17.1717; // magic number for searching on
+    telemVal[0] = (float)logBuffer[dumpIndex].usec0;  // u32: microseconds
+    telemVal[1] = logBuffer[dumpIndex].sample1;       // f: phase
+    telemVal[2] = logBuffer[dumpIndex].sample2;       // f: throttle
+    telemVal[3] = logBuffer[dumpIndex].sample3;       // f: cos(phase1)
+    telemVal[4] = logBuffer[dumpIndex].sample4;       // f: loop count
+    telemVal[5] = logBuffer[dumpIndex].sample5;       // f: unused (0.0)
+    telemVal[6] = logBuffer[dumpIndex].sample6;       // f: unused (0.0)
+    telemVal[7] = logBuffer[dumpIndex].sample7;       // f: magic number (17.1717)
 
     dumpIndex++;
 
@@ -487,7 +489,7 @@ void dumpLoggedData() {
       dumpMode = false;
       dataReady = false;
       logIndex = 0;
-      if(DEBUG_HLTELEM){Serial.println("HL Dump complete");}
+      if (DEBUG_HLTELEM) { Serial.println("HL Dump complete"); }
     }
   }
 }
@@ -552,8 +554,18 @@ void MeltybrainDrive1() {
       Serial.print(" th1:");
       Serial.println(th1);
     }
-    setThrottle(th1, -th2);            // -th2 because of CW spin direction
-    logSample(hotLoopCount, cos_ph1, currentTimeMicros - usLoopStartTime);  // ADD THIS LINE
+    setThrottle(th1, -th2);  // -th2 because of CW spin direction
+
+    logSample(
+      currentTimeMicros,    // usec0: relative microseconds
+      continuousPhase,      // sample1: phase
+      th1,                  // sample2: motor1 throttle
+      cos_ph1,              // sample3: cos(phase1)
+      (float)hotLoopCount,  // sample4: loop count
+      0.0,                  // sample5: unused
+      0.0,                  // sample6: unused
+      17.1717               // sample7: magic number
+    );
 
 
     bool LEDOn = cos_led > 0.7071 * (1.4 - widthScale * 0.9);  // Magic numbers for ~45deg arc
@@ -643,7 +655,13 @@ void loop() {
 
         // Send telemetry
         for (int k = 0; k < 8; k++) {
-          Serial2.printf("%s,%f", telemDumpLbl[k], telemVal[k]);
+          if (k == 0) {
+            // Index 0: uint32_t format
+            Serial2.printf("%s,%lu", telemDumpLbl[k], (uint32_t)telemVal[k]);
+          } else {
+            // Indices 1-7: float format
+            Serial2.printf("%s,%f", telemDumpLbl[k], telemVal[k]);
+          }
           if (k < 7) {
             Serial2.print(",");
           } else {
@@ -653,18 +671,24 @@ void loop() {
 
       } else {
         // Normal mode telemetry
-        telemVal[0] = radiusSize * 1000.0;
-        telemVal[1] = ledOffset;
-        telemVal[2] = hotHz;
-        telemVal[3] = motor1Throttle;
-        telemVal[4] = aux6;
-        telemVal[5] = FAILSAFE;
-        telemVal[6] = lastRPS * 60.0;
-        telemVal[7] = (accel_event.acceleration.x - accelOffsetX);
+        telemVal[0] = micros();                                     // u32: microsecond timestamp
+        telemVal[1] = radiusSize * 1000.0;                          // f: radius in mm
+        telemVal[2] = ledOffset;                                    // f: LED offset
+        telemVal[3] = hotHz;                                        // f: hot loop frequency
+        telemVal[4] = aux6;                                         // f: mix fraction (aux6)
+        telemVal[5] = kalmanQ;                                      // f: kalman Q parameter
+        telemVal[6] = lastRPS * 60.0;                               // f: RPM
+        telemVal[7] = (accel_event.acceleration.x - accelOffsetX);  // f: accel X (up/down)
 
         // Send telemetry
         for (int k = 0; k < 8; k++) {
-          Serial2.printf("%s,%f", telemLbl[k], telemVal[k]);
+          if (k == 0) {
+            // Index 0: uint32_t format
+            Serial2.printf("%s,%lu", telemLbl[k], (uint32_t)telemVal[k]);
+          } else {
+            // Indices 1-7: float format
+            Serial2.printf("%s,%f", telemLbl[k], telemVal[k]);
+          }
           if (k < 7) {
             Serial2.print(",");
           } else {

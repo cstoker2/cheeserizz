@@ -1,4 +1,5 @@
 /*
+12-11-25 changing logger outputs
 12-8-25 logging hotloop is working, aux6 is regulating pulse strength edit G1 offset in mix , aux7 trigger and throttle down for data dump w/ 17.17 as magic number value
 want to try changing library to have a packet flag for labels vs data to eliminate duplicate transmission of labels.
 12-1-25 attempt at recording hotloop for later logging telem output.

@@ -86,11 +86,20 @@ void ESPNowLogger::setIntervals(uint32_t dataIntervalMs, uint32_t headerInterval
   _headerIntervalMs = headerIntervalMs;
 }
 
-// Set a telemetry value
-void ESPNowLogger::setValue(uint8_t index, float value) {
-  if (index < MAX_DATA_VALUES) {
-    _dataPacket.values[index] = value;
+// Set a telemetry value (uint32_t version for index 0)
+void ESPNowLogger::setValue(uint8_t index, uint32_t value) {
+  if (index == 0) {
+    _dataPacket.value0 = value;
   }
+  // Ignore if index != 0
+}
+
+// Set a telemetry value (float version for indices 1-7)
+void ESPNowLogger::setValue(uint8_t index, float value) {
+  if (index > 0 && index < MAX_DATA_VALUES) {
+    _dataPacket.values[index - 1] = value;
+  }
+  // Ignore if index == 0 (must use uint32_t version)
 }
 
 // Set a label for a telemetry value
@@ -150,10 +159,18 @@ void ESPNowLogger::sendHeader() {
   }
 }
 
-// Get a telemetry value (for slave)
+// Get a telemetry value (uint32_t version for index 0)
+uint32_t ESPNowLogger::getValueUint32(uint8_t index) {
+  if (index == 0) {
+    return _dataPacket.value0;
+  }
+  return 0;
+}
+
+// Get a telemetry value (float version for indices 1-7)
 float ESPNowLogger::getValue(uint8_t index) {
-  if (index < MAX_DATA_VALUES) {
-    return _dataPacket.values[index];
+  if (index > 0 && index < MAX_DATA_VALUES) {
+    return _dataPacket.values[index - 1];
   }
   return 0.0f;
 }

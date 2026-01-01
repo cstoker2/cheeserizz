@@ -150,25 +150,25 @@ volatile uint8_t bbit;
 
 //Telemetry Labels
 const char *telemLbl[] = {
-  "radiusmm",  // f1: , version number
-  "LEDoffs",   // fl2:
-  "hotHZ",     //fl3:
-  "m1Th",      // fl4:
-  "aux6",      // fl5:
-  "FailSafe",  // fl6:
-  "rpm",       // fl7:
-  "accelX"     // fl8:
+  "uSec    ",  // u32 0: unsigned int microseconds
+  "radius",    //   f 1:
+  "LEDoffst",  //   f 2:
+  "hotHZ",     //   f 3:
+  "mixFrac",   //   f 4: aux6
+  "kalmanQ",   //   f 5: kalman Q
+  "rpm",       //   f 6:
+  "accelX"     //   f 7:
 };
 
 const char *telemDumpLbl[] = {
-  "index",    // f1: , version number
-  "us",       // fl2:
-  "phase",    //fl3:
-  "m1Th",     // fl4:
-  "m2Th",     // fl5:
-  "cosph1",   // fl6:
-  "LoopCnt",  // fl7:
-  "svntn"     // fl8:
+  "uSec",      // u32 0: microseconds
+  "phase",     // f 1:
+  "Throttle",  // f 2:
+  "cosph1",    // f 3:
+  "LoopCnt",   // f 4:
+  "",          // f 5:
+  "",          // f 6:
+  "magicNum"   // f 7:
 };
 
 // ============ DATA LOGGING STRUCTURES ============
@@ -176,12 +176,14 @@ const char *telemDumpLbl[] = {
 
 // Structure to hold one sample of logged data
 struct LogSample {
-  float timestamp_us;
-  float phase;
-  float m1_throttle;
-  float m2_throttle;
-  float cos_phase1;
-  float hotloop_count;
+  uint32_t usec0;
+  float sample1;
+  float sample2;
+  float sample3;
+  float sample4;
+  float sample5;
+  float sample6;
+  float sample7;
 };
 
 // Logging state variables
