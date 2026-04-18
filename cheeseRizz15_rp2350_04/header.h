@@ -29,9 +29,9 @@
 #define DSHOT2_PIN 27  //D1 xiao2350
 
 //Interrupt timers
-#define ACCEL_IRQ_INTERVAL 1    // interrupt in ms 1000hz
-#define DSHOT_IRQ_INTERVAL 1.6  // interrupt in ms 625hz
-#define LED_IRQ_INTERVAL 100    // interrupt in ms 10hz
+#define ACCEL_IRQ_INTERVAL 1000    // interrupt in us,  1ms, 1000hz
+#define DSHOT_IRQ_INTERVAL 1600  // interrupt in us,  1.6ms, 625hz
+#define LED_IRQ_INTERVAL 50000    // interrupt in us,  50ms, 20hz
 
 // Motor direction constants
 #define MOTOR1_DIRECTION -1.0   // Set to -1 to reverse motor 1, 1 for normal LEFT

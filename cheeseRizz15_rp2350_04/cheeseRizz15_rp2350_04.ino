@@ -124,13 +124,13 @@ void setup() {
   pixel.show();
 
   //start interrupt timers:
-  if (AccelTimer.attachInterruptInterval(ACCEL_IRQ_INTERVAL * 1000, AccelTimerHandler)) {  // run 1000hz
+  if (AccelTimer.attachInterruptInterval(ACCEL_IRQ_INTERVAL, AccelTimerHandler)) {  // run 1000hz
     AccelTimer.restartTimer();
   }
-  if (DshotTimer.attachInterruptInterval(DSHOT_IRQ_INTERVAL * 1000, DshotTimerHandler)) {  // run 625hz
+  if (DshotTimer.attachInterruptInterval(DSHOT_IRQ_INTERVAL, DshotTimerHandler)) {  // run 625hz
     DshotTimer.restartTimer();
   }
-  if (LEDTimer.attachInterruptInterval(LED_IRQ_INTERVAL * 1000, LEDTimerHandler)) {  // run 20hz
+  if (LEDTimer.attachInterruptInterval(LED_IRQ_INTERVAL, LEDTimerHandler)) {  // run 20hz
     LEDTimer.restartTimer();
   }
 
