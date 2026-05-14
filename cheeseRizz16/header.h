@@ -48,17 +48,17 @@
 //Tx=0, Rx =1
 
 //DSHOT
-#define DSHOT1_PIN 2  //Right, blue
-#define DSHOT2_PIN 3  //Left, yellow
+#define DSHOT1_PIN 2  //Left, Yellow
+#define DSHOT2_PIN 3  //Right, Blue
 
 //Interrupt timers
 #define ACCEL_IRQ_INTERVAL 1000    // interrupt in us,  1ms, 1000hz
 #define DSHOT_IRQ_INTERVAL 1600  // interrupt in us,  1.6ms, 625hz
-#define LED_IRQ_INTERVAL 50000    // interrupt in us,  50ms, 20hz
+#define LED_IRQ_INTERVAL 100000    // interrupt in us,  100ms, 10hz this is disabled in melt mode.
 
 // Motor direction constants
-#define MOTOR1_DIRECTION -1.0   // Set to -1 to reverse motor 1, 1 for normal LEFT
-#define MOTOR2_DIRECTION 1.0    // Set to -1 to reverse motor 2, 1 for normal  RIGHT
+#define MOTOR1_DIRECTION 1.0   //  Set to -1 to reverse motor 1, 1 for normal
+#define MOTOR2_DIRECTION 1.0    //  Set to -1 to reverse motor 2, 1 for normal
 #define HEADING_SMOOTHING 0.85  // Smoothing factor for heading updates (0-1)
 #define TRANSL_STRENGTH 0.75f   // phase strength multiplier base was 0.25f. 0.5 was ok. Try 0.75?
 

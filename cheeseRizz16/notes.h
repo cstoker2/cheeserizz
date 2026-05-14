@@ -1,5 +1,7 @@
 /*
 5-14-2026 changed rps threshold from 7 to 5 for 300rpm min translate speed. Removd one led.
+esc settings: timing 22.5, 125% startpower, NO sinusoidal 1740kv 14poles, no limits 1000,1500,2000, 50 deadband
+settings for reasonable translation:  r 05 or 06 on radio, LED 43 or 44.
 5-13-2026 modded to read x and y accel at 45* and average Removed some accel data checks.
 5-13-2026 updated for waveshare2350 on pcb LEDS: Data=4 Clock=5 esc: R=Blue=2 L=yel=3 elrs rx phrase 1017
 12-11-25 changing logger outputs

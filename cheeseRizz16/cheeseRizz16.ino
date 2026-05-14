@@ -50,8 +50,8 @@ void setup() {
   crsf->setRcChannelsCallback(onReceiveRcChannels);
 
   // make the DSHOTs
-  esc1 = new BidirDShotX1(DSHOT1_PIN);
-  esc2 = new BidirDShotX1(DSHOT2_PIN);
+  esc1 = new BidirDShotX1(DSHOT1_PIN);  //
+  esc2 = new BidirDShotX1(DSHOT2_PIN);  //
 
   //Accelerometer
   if (!lis.begin_SPI(H3LIS331_CS, H3LIS331_SCK, H3LIS331_MISO, H3LIS331_MOSI)) {
@@ -282,9 +282,9 @@ float modulateThrottle(float inputThrottle, int idx) {
 
 void TankDrive() {
   float x = stickHoriz / 6.0;  // Reduced to 16% for less twitchy steering
-  float y = stickVert / 5.0;
-  float m1 = y + x;  // Left motor
-  float m2 = y - x;  // Right motor
+  float y = -stickVert / 5.0;  // had to add neg to get drive correct.
+  float m1 = y + x;            // Left motor
+  float m2 = y - x;            // Right motor
 
   m1 = modulateThrottle(m1, 0);
   m2 = modulateThrottle(m2, 1);
@@ -319,8 +319,8 @@ void updateInputs() {
     radiusInput = inputPot;
   }
 
-  rudderInput = map(rudderInput, 1000, 2000, -300, 300);                // rudder can change by =/- 3mm
-  radiusSize = map(radiusInput + rudderInput, 1000, 2000, 2500, 3500);  // 25mm to 35mm range
+  rudderInput = map(rudderInput, 1000, 2000, -300, 300);                // rudder can change by =/- 5mm
+  radiusSize = map(radiusInput + rudderInput, 1000, 2000, 2000, 4000);  // 20mm to 40mm range
   radiusSize = radiusSize / 100000.0;
 
   kalmanQ = inputToggleL;  // should be 1000, 1500 or 2000
@@ -375,14 +375,14 @@ float calculateW() {  // probably takes more than 310us to get sensor data
 
   // 2. Apply calibration offsets
   float z = s.acceleration.z - accelOffsetZ;
-  float x = 0.7071 * (s.acceleration.x - accelOffsetX);  // radial component of X 
-  float y = 0.7071 * (s.acceleration.y - accelOffsetY);  // radial component of Y
+  float x = fabs(1.4142 * (s.acceleration.x - accelOffsetX));  // radial component of X
+  float y = fabs(1.4142 * (s.acceleration.y - accelOffsetY));  // radial component of Y
 
   // 3a. Update Kalman filter with calibrated value
   //float spinAccel = kalmanFilter.updateEstimate(z);
   // 3b. plain sensor reading instead of kalman
-  float spinAccel = (x + y) * 0.5;  // average values 
-  estimated_accel = spinAccel;  // Store for telemetry
+  float spinAccel = (x + y) * 0.5;  // average values
+  estimated_accel = spinAccel;      // Store for telemetry
 
 
   // 4. Check accelerometer data after filtering - remove negatives, non-number and inf values
@@ -565,7 +565,7 @@ void MeltybrainDrive1() {
       Serial.print(" th1:");
       Serial.println(th1);
     }
-    setThrottle(th1, -th2);  // -th2 because of CW spin direction
+    setThrottle(th1, -th2);  // -th2 because of CW spin direction (really? seems sus...)
 
     logSample(
       currentTimeMicros,    // usec0: relative microseconds
@@ -654,6 +654,12 @@ void loop() {
       Serial.printf(" Rmm: %.1f ", radiusSize * 1000);
       Serial.print(" Led: ");
       Serial.print(ledOffset);
+      Serial.print(" estAcc: ");
+      Serial.print(estimated_accel);
+      Serial.print(" X: ");
+      Serial.print(accel_event.acceleration.x - accelOffsetX);
+      Serial.print(" Y: ");
+      Serial.print(accel_event.acceleration.y - accelOffsetY);
       Serial.print(" Z: ");
       Serial.println(accel_event.acceleration.z - accelOffsetZ);
     }
